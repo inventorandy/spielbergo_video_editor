@@ -27,6 +27,9 @@ class NewVideoViewController: UIViewController {
   // Video File
   var finalID: String = UUID().uuidString
 
+  // Video Composition
+  var composer: SpielbergoComposer = SpielbergoComposer()
+
   // Buttons
   var recordButton: UIButton!
   var deleteButton: UIButton!
@@ -465,19 +468,29 @@ class NewVideoViewController: UIViewController {
   /// Button Handlers
   // Done Button
   @objc private func doneTapped(_ sender: UIButton) {
+    print("Done button tapped")
+    // If the done button was already tapped, return early
+    if doneWasTapped {
+      print("Done button was already tapped, returning early")
+      return
+    }
     // If there are no recorded videos, return early
     guard !recordedVideos.isEmpty else {
+      print("No recorded videos to process")
       return
     }
     // Set the doneWasTapped flag to true
     doneWasTapped = true
-    // Dismiss the view controller
-    dismiss(animated: true) {
-      // Clear the recorded videos array
-      self.recordedVideos.removeAll()
-      // Clear the Flutter result
-      self.flutterResult = nil
-    }
+
+    // Create the composition
+    createComposition()
+    // // Dismiss the view controller
+    // dismiss(animated: true) {
+    //   // Clear the recorded videos array
+    //   self.recordedVideos.removeAll()
+    //   // Clear the Flutter result
+    //   self.flutterResult = nil
+    // }
   }
   // Close Dialog
   @objc private func closeTapped(_ sender: UIButton) {
@@ -605,6 +618,30 @@ class NewVideoViewController: UIViewController {
     }
   }
 
+  /// Composition Creation
+  private func createComposition() {
+    DispatchQueue.main.async {
+      Task {
+        await self.composer.createMutableComposition(
+          assets: self.recordedVideos
+        ) { [weak self] result in
+          switch result {
+            case .success(let composition, let videoComposition):
+              // Handle the successful composition creation
+              print("Composition created successfully")
+              // TODO: switch to the next screen with the composition
+            case .failure(let message, let error):
+              // Handle the error
+              print("Error creating composition: \(message)")
+              if let error = error {
+                print("Error details: \(error.localizedDescription)")
+              }
+          }
+        }
+      }
+    }
+  }
+
   /// Visibility Handlers
   // Handle all visibility of UI elements based on recording state
   private func updateUIVisibility() {
@@ -722,6 +759,25 @@ extension NewVideoViewController: AVCaptureFileOutputRecordingDelegate {
     // TODO: create the composition for the next screen
     if doneWasTapped {
       print("Creating composition for next screen")
+      DispatchQueue.main.async {
+        Task {
+          await self.composer.createMutableComposition(
+            assets: self.recordedVideos
+          ) { [weak self] result in
+            switch result {
+              case .success(let composition, let videoComposition):
+                // Handle the successful composition creation
+                print("Composition created successfully")
+              case .failure(let message, let error):
+                // Handle the error
+                print("Error creating composition: \(message)")
+                if let error = error {
+                  print("Error details: \(error.localizedDescription)")
+                }
+            }
+          }
+        }
+      }
     }
 
     // Update the UI visibility
