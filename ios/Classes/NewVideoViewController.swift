@@ -124,59 +124,35 @@ class NewVideoViewController: UIViewController {
     previewLayer.frame = CGRect(x: 0, y: yOrigin, width: screenWidth, height: height)
   }
   /// Setup View Methods
-  // Setup Camera Preview Layer
+  // MARK: - Setup Camera Preview
   func setupCameraPreview() {
-    // Set the Capture Session Preset
     captureSession.sessionPreset = .high
-
-    // Get the default video device
-    guard let camera: AVCaptureDevice = AVCaptureDevice.default(
-      .builtInWideAngleCamera,
-      for: .video,
-      position: .front
-    ) else {
+    guard let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) else {
       flutterResult?(FlutterError(code: "NO_CAMERA", message: "No camera found", details: nil))
       return
     }
 
-    // Create an input from the camera
     do {
-      // Camera input
       let cameraInput = try AVCaptureDeviceInput(device: camera)
       if captureSession.canAddInput(cameraInput) {
         captureSession.addInput(cameraInput)
         self.currentInput = cameraInput
-      } else {
-        flutterResult?(FlutterError(code: "INPUT_ERROR", message: "Cannot add camera input", details: nil))
-        return
       }
 
-      // Microphone input
-      if let mic: AVCaptureDevice = AVCaptureDevice.default(for: .audio) {
+      if let mic = AVCaptureDevice.default(for: .audio) {
         let micInput = try AVCaptureDeviceInput(device: mic)
         if captureSession.canAddInput(micInput) {
           captureSession.addInput(micInput)
-        } else {
-          flutterResult?(FlutterError(code: "INPUT_ERROR", message: "Cannot add microphone input", details: nil))
-          return
         }
-      } else {
-        flutterResult?(FlutterError(code: "NO_MICROPHONE", message: "No microphone found", details: nil))
-        return
       }
 
-      // Movie file output
-      let output: AVCaptureMovieFileOutput = AVCaptureMovieFileOutput()
+      let output = AVCaptureMovieFileOutput()
       if captureSession.canAddOutput(output) {
         captureSession.addOutput(output)
         self.currentOutput = output
-      } else {
-        flutterResult?(FlutterError(code: "OUTPUT_ERROR", message: "Cannot add movie file output", details: nil))
-        return
       }
 
-      // Preview layer
-      let layer: AVCaptureVideoPreviewLayer = AVCaptureVideoPreviewLayer(session: captureSession)
+      let layer = AVCaptureVideoPreviewLayer(session: captureSession)
       layer.videoGravity = .resizeAspectFill
       layer.cornerRadius = 20.0
       layer.masksToBounds = true
@@ -184,13 +160,11 @@ class NewVideoViewController: UIViewController {
       view.layer.addSublayer(layer)
       self.previewLayer = layer
 
-      // Start the capture session
-      DispatchQueue.global(qos: .background).async {
+      Task { @MainActor in
         self.captureSession.startRunning()
       }
     } catch {
       flutterResult?(FlutterError(code: "INPUT_ERROR", message: "Error setting up camera input", details: error.localizedDescription))
-      return
     }
   }
 
@@ -466,33 +440,14 @@ class NewVideoViewController: UIViewController {
   }
 
   /// Button Handlers
-  // Done Button
+  // MARK: - Done Button Tapped
   @objc private func doneTapped(_ sender: UIButton) {
-    print("Done button tapped")
-    // If the done button was already tapped, return early
-    if doneWasTapped {
-      print("Done button was already tapped, returning early")
-      return
-    }
-    // If there are no recorded videos, return early
-    guard !recordedVideos.isEmpty else {
-      print("No recorded videos to process")
-      return
-    }
-    // Set the doneWasTapped flag to true
+    guard !doneWasTapped, !recordedVideos.isEmpty else { return }
     doneWasTapped = true
-
-    // Create the composition
     createComposition()
-    // // Dismiss the view controller
-    // dismiss(animated: true) {
-    //   // Clear the recorded videos array
-    //   self.recordedVideos.removeAll()
-    //   // Clear the Flutter result
-    //   self.flutterResult = nil
-    // }
   }
-  // Close Dialog
+
+  // MARK: - Close Button Tapped
   @objc private func closeTapped(_ sender: UIButton) {
     if isRecording {
       currentOutput?.stopRecording()
@@ -502,7 +457,6 @@ class NewVideoViewController: UIViewController {
       try? FileManager.default.removeItem(at: item.url)
     }
     recordedVideos.removeAll()
-    // Call the Flutter result with nil to indicate cancellation
     flutterResult?(nil)
     dismiss(animated: true)
   }
@@ -619,29 +573,25 @@ class NewVideoViewController: UIViewController {
   }
 
   /// Composition Creation
+  // MARK: - Create Composition
   private func createComposition() {
-    DispatchQueue.main.async {
-      Task {
-        await self.composer.createMutableComposition(
-          assets: self.recordedVideos
-        ) { [weak self] result in
-          // NO async work here
-          guard let self = self else { return }
-          switch result {
-            case .success(let composition, let videoComposition):
-              Task { @MainActor in
-                let videoReviewVC = VideoReviewViewController(
-                  composition: composition,
-                  videoComposition: videoComposition
-                )
-                self.present(videoReviewVC, animated: false)
-              }
-            case .failure(let message, let error):
-              print("Error creating composition: \(message)")
-              if let error = error {
-                print("Error details: \(error.localizedDescription)")
-              }
-          }
+    Task {
+      await composer.createMutableComposition(assets: recordedVideos) { [weak self] result in
+        guard let self = self else { return }
+        switch result {
+          case .success(let composition, let videoComposition):
+            Task { @MainActor in
+              let videoReviewVC = VideoReviewViewController(
+                composition: composition,
+                videoComposition: videoComposition
+              )
+              self.present(videoReviewVC, animated: false)
+            }
+          case .failure(let message, let error):
+            print("Error creating composition: \(message)")
+            if let error = error {
+              print("Error details: \(error.localizedDescription)")
+            }
         }
       }
     }

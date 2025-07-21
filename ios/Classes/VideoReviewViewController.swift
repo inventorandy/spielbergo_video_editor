@@ -29,16 +29,23 @@ class VideoReviewViewController: UIViewController {
     self.videoComposition = videoComposition
 
     // Initialize the player with the composition
-    self.player = AVPlayer(playerItem: AVPlayerItem(asset: composition))
+    // Use AVPlayerItem with videoComposition
+    let playerItem = AVPlayerItem(asset: composition)
+    playerItem.videoComposition = videoComposition
+    self.player = AVPlayer(playerItem: playerItem)
     self.playerLayer = AVPlayerLayer(player: player)
 
     // Call the super initializer
     super.init(nibName: nil, bundle: nil)
+
+    // Force full screen presentation
+    self.modalPresentationStyle = .fullScreen
   }
 
   override func viewDidLoad() {
     super.viewDidLoad()
     // Additional setup after loading the view
+    view.backgroundColor = .black
     setupVideoPlayer()
   }
 
@@ -49,10 +56,11 @@ class VideoReviewViewController: UIViewController {
   }
 
   /// Setup View Methods
-  func setupVideoPlayer() {
+  // MARK: - Setup Video Player
+  private func setupVideoPlayer() {
     // Set the Constraints for the player layer
     playerLayer.frame = view.bounds
-    playerLayer.videoGravity = .resizeAspect
+    playerLayer.videoGravity = .resizeAspectFill
     view.layer.addSublayer(playerLayer)
 
     // Start playing the video
