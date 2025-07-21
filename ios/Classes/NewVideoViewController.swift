@@ -625,13 +625,18 @@ class NewVideoViewController: UIViewController {
         await self.composer.createMutableComposition(
           assets: self.recordedVideos
         ) { [weak self] result in
+          // NO async work here
+          guard let self = self else { return }
           switch result {
             case .success(let composition, let videoComposition):
-              // Handle the successful composition creation
-              print("Composition created successfully")
-              // TODO: switch to the next screen with the composition
+              Task { @MainActor in
+                let videoReviewVC = VideoReviewViewController(
+                  composition: composition,
+                  videoComposition: videoComposition
+                )
+                self.present(videoReviewVC, animated: false)
+              }
             case .failure(let message, let error):
-              // Handle the error
               print("Error creating composition: \(message)")
               if let error = error {
                 print("Error details: \(error.localizedDescription)")
