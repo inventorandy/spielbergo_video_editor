@@ -7,6 +7,8 @@ private let recordCircleHasVideosSize: CGFloat = 24
 private let progressCircleStartAngle: CGFloat = -.pi / 2
 private let progressCircleEndAngle: CGFloat = (.pi * 2) - (.pi / 2)
 
+/// This class handles the recording screen where users can record sections of
+/// their video, switch cameras and add / delete clips + set a recording limit.
 class NewVideoViewController: UIViewController {
   var flutterResult: FlutterResult?
 
@@ -587,6 +589,8 @@ class NewVideoViewController: UIViewController {
               )
               self.present(videoReviewVC, animated: false)
             }
+            doneWasTapped = false
+            updateUIVisibility()
           case .failure(let message, let error):
             print("Error creating composition: \(message)")
             if let error = error {

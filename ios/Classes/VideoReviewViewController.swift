@@ -2,19 +2,24 @@ import UIKit
 import AVFoundation
 import Flutter
 
+/// This class handles the review screen where users can add basic effects
+/// like text overlays and filters. There are also buttons for the timeline
+/// editor and more complex effects.
 class VideoReviewViewController: UIViewController {
   // Composition and Video Composition
   var composition: AVMutableComposition?
   var videoComposition: AVMutableVideoComposition?
 
-  // Flag for whether the video is playing
-  var isPlaying: Bool = true
+  // Player
+  private var playerLayer: AVPlayerLayer = AVPlayerLayer()
+  private var queuePlayer: AVQueuePlayer?
+  private var playerLooper: AVPlayerLooper?
 
-  // Player for the video
-  var playerLayer: AVPlayerLayer = AVPlayerLayer()
-  var player: AVPlayer = AVPlayer()
+  // Buttons
+  private var closeButton: UIButton!
+  private var addTextButton: UIButton!
 
-  // Required initializer for using Storyboards
+  // Required initializer for Storyboards
   required init?(coder: NSCoder) {
     fatalError("init(coder:) has not been implemented")
   }
@@ -24,46 +29,117 @@ class VideoReviewViewController: UIViewController {
     composition: AVMutableComposition,
     videoComposition: AVMutableVideoComposition
   ) {
-    // Set the Initial Composition and Video Composition
+    // Set the composition and videoComposition properties
     self.composition = composition
     self.videoComposition = videoComposition
 
-    // Initialize the player with the composition
-    // Use AVPlayerItem with videoComposition
-    let playerItem = AVPlayerItem(asset: composition)
-    playerItem.videoComposition = videoComposition
-    self.player = AVPlayer(playerItem: playerItem)
-    self.playerLayer = AVPlayerLayer(player: player)
+    // Initialize the buttons
+    self.closeButton = UIButton(type: .system)
+    self.addTextButton = UIButton(type: .custom)
 
-    // Call the super initializer
     super.init(nibName: nil, bundle: nil)
-
-    // Force full screen presentation
     self.modalPresentationStyle = .fullScreen
   }
 
   override func viewDidLoad() {
     super.viewDidLoad()
-    // Additional setup after loading the view
     view.backgroundColor = .black
     setupVideoPlayer()
+    setupCloseButton()
+    setupAddTextButton()
   }
 
   override func viewDidLayoutSubviews() {
     super.viewDidLayoutSubviews()
-    // Update the player layer frame to match the view bounds
     playerLayer.frame = view.bounds
   }
 
-  /// Setup View Methods
+  /// UI Element Setup
   // MARK: - Setup Video Player
   private func setupVideoPlayer() {
-    // Set the Constraints for the player layer
-    playerLayer.frame = view.bounds
-    playerLayer.videoGravity = .resizeAspectFill
-    view.layer.addSublayer(playerLayer)
+    guard let composition = composition else { return }
 
-    // Start playing the video
-    player.play()
+    let playerItem = AVPlayerItem(asset: composition)
+    playerItem.videoComposition = videoComposition
+
+    // Setup AVQueuePlayer and AVPlayerLooper for looping
+    queuePlayer = AVQueuePlayer(playerItem: playerItem)
+    if let queuePlayer = queuePlayer {
+      playerLooper = AVPlayerLooper(player: queuePlayer, templateItem: playerItem)
+
+      playerLayer = AVPlayerLayer(player: queuePlayer)
+      playerLayer.videoGravity = .resizeAspectFill
+      playerLayer.frame = view.bounds
+      view.layer.addSublayer(playerLayer)
+
+      queuePlayer.play()
+    }
+  }
+
+  // MARK: - Setup Close Button
+  private func setupCloseButton() {
+    self.closeButton.setImage(UIImage(systemName: "chevron.backward"), for: .normal)
+    self.closeButton.tintColor = .white
+    self.closeButton.translatesAutoresizingMaskIntoConstraints = false
+    self.closeButton.addTarget(self, action: #selector(closeTapped), for: .touchUpInside)
+    view.addSubview(self.closeButton)
+
+    NSLayoutConstraint.activate([
+      self.closeButton.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 16),
+      self.closeButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
+      self.closeButton.widthAnchor.constraint(equalToConstant: 32),
+      self.closeButton.heightAnchor.constraint(equalToConstant: 32)
+    ])
+  }
+
+  // MARK: - Add Text Button
+  private func setupAddTextButton() {
+    self.addTextButton.translatesAutoresizingMaskIntoConstraints = false
+    let image = UIImage(
+      systemName: "textformat",
+      withConfiguration: UIImage.SymbolConfiguration(pointSize: 28, weight: .regular)
+    )
+
+    self.addTextButton.setImage(image, for: .normal)
+    self.addTextButton.tintColor = .white
+
+    // Remove extra padding around image
+    self.addTextButton.contentEdgeInsets = .zero
+    self.addTextButton.imageEdgeInsets = .zero
+    self.addTextButton.imageView?.contentMode = .scaleAspectFit
+
+    // Optional: round background
+    self.addTextButton.layer.cornerRadius = 8
+    self.addTextButton.clipsToBounds = true
+
+    self.view.addSubview(self.addTextButton)
+
+    NSLayoutConstraint.activate([
+      self.addTextButton.centerYAnchor.constraint(
+        equalTo: view.safeAreaLayoutGuide.topAnchor,
+        constant: 32.0
+      ),
+      self.addTextButton.trailingAnchor.constraint(
+        equalTo: view.safeAreaLayoutGuide.trailingAnchor,
+        constant: -16.0
+      ),
+      self.addTextButton.widthAnchor.constraint(equalToConstant: 36),
+      self.addTextButton.heightAnchor.constraint(equalToConstant: 36)
+    ])
+
+    // Add the target action for the Switch Camera Button
+    self.addTextButton.addTarget(self, action: #selector(addTextTapped), for: .touchUpInside)
+  }
+
+  /// Button Actions
+  // MARK: - Close Button Action
+  @objc private func closeTapped() {
+    dismiss(animated: true)
+  }
+
+  /// MARK: - Add Text Button Action
+  @objc private func addTextTapped() {
+    // Implement the logic to add text to the video
+    print("Add Text button tapped")
   }
 }
