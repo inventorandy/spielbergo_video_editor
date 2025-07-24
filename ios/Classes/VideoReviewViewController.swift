@@ -145,6 +145,6 @@ class VideoReviewViewController: UIViewController {
   /// MARK: - Add Text Button Action
   @objc private func addTextTapped() {
     print("Add Text button tapped")
-    textOverlayManager.addTextOverlay()
+    _ = TextOverlayView(containerView: view)
   }
 }
