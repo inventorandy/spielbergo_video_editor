@@ -19,6 +19,9 @@ class VideoReviewViewController: UIViewController {
   private var closeButton: UIButton!
   private var addTextButton: UIButton!
 
+  // Text Overlay Manager
+  private var textOverlayManager: TextOverlayManager!
+
   // Required initializer for Storyboards
   required init?(coder: NSCoder) {
     fatalError("init(coder:) has not been implemented")
@@ -47,6 +50,8 @@ class VideoReviewViewController: UIViewController {
     setupVideoPlayer()
     setupCloseButton()
     setupAddTextButton()
+    // Initialize the Text Overlay Manager
+    textOverlayManager = TextOverlayManager(parentView: self.view)
   }
 
   override func viewDidLayoutSubviews() {
@@ -139,7 +144,7 @@ class VideoReviewViewController: UIViewController {
 
   /// MARK: - Add Text Button Action
   @objc private func addTextTapped() {
-    // Implement the logic to add text to the video
     print("Add Text button tapped")
+    textOverlayManager.addTextOverlay()
   }
 }
