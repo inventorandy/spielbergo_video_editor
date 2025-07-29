@@ -75,7 +75,7 @@ final class TextOverlayView: UIView, UITextViewDelegate {
     slider.value = Float(currentFontSize)
 
     slider.transform = CGAffineTransform(rotationAngle: -.pi / 2)
-    slider.center = CGPoint(x: 20, y: containerView.bounds.height / 4)
+    slider.center = CGPoint(x: 20, y: ((containerView.bounds.height / 4 ) + 48.0))
 
     // Custom thumb
     let thumbSize: CGFloat = 18
@@ -236,8 +236,12 @@ final class TextOverlayView: UIView, UITextViewDelegate {
   }
 
   func textView(_ textView: UITextView,
-                shouldChangeTextIn range: NSRange,
-                replacementText text: String) -> Bool {
+              shouldChangeTextIn range: NSRange,
+              replacementText text: String) -> Bool {
+    // Block enter key (new lines)
+    if text == "\n" {
+        return false
+    }
     return true
   }
 }
