@@ -19,9 +19,6 @@ class VideoReviewViewController: UIViewController {
   private var closeButton: UIButton!
   private var addTextButton: UIButton!
 
-  // Text Overlay Manager
-  private var textOverlayManager: TextOverlayManager!
-
   // Required initializer for Storyboards
   required init?(coder: NSCoder) {
     fatalError("init(coder:) has not been implemented")
@@ -50,8 +47,6 @@ class VideoReviewViewController: UIViewController {
     setupVideoPlayer()
     setupCloseButton()
     setupAddTextButton()
-    // Initialize the Text Overlay Manager
-    textOverlayManager = TextOverlayManager(parentView: self.view)
   }
 
   override func viewDidLayoutSubviews() {
@@ -122,7 +117,7 @@ class VideoReviewViewController: UIViewController {
     NSLayoutConstraint.activate([
       self.addTextButton.centerYAnchor.constraint(
         equalTo: view.safeAreaLayoutGuide.topAnchor,
-        constant: 32.0
+        constant: 48.0
       ),
       self.addTextButton.trailingAnchor.constraint(
         equalTo: view.safeAreaLayoutGuide.trailingAnchor,

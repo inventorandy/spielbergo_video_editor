@@ -6,6 +6,7 @@ final class TextOverlayView: UIView, UITextViewDelegate {
   private let displayLabel = UILabel()
   private let editTextView = UITextView()
   private var dismissLayer: UIButton?
+  private var fontSlider: UISlider?
   
   // MARK: - State
   private var isEditingMode = true
@@ -16,13 +17,11 @@ final class TextOverlayView: UIView, UITextViewDelegate {
   private var isFirstEdit = true
   private var logicalTextWidth: CGFloat?
   
-  // Character limit
+  // Character and font settings
   private let characterLimit = 200
-  
-  // Font scaling
-  private let maxLinesBeforeScaling = 5
-  private let minFontSize: CGFloat = 18
-  private let defaultFontSize: CGFloat = 28
+  private let minFontSize: CGFloat = 16
+  private let maxFontSize: CGFloat = 48
+  private var currentFontSize: CGFloat = 28
   
   // MARK: - Init
   init(containerView: UIView, initialText: String? = nil) {
@@ -38,7 +37,7 @@ final class TextOverlayView: UIView, UITextViewDelegate {
     setupEditTextView()
     setupGestures()
     
-    logicalTextWidth = containerView.bounds.width - 40 // 20pt margin each side
+    logicalTextWidth = containerView.bounds.width - 40
     center = editingPosition(in: containerView)
     
     containerView.addSubview(self)
@@ -53,7 +52,7 @@ final class TextOverlayView: UIView, UITextViewDelegate {
   private func setupDisplayLabel() {
     displayLabel.textAlignment = .center
     displayLabel.textColor = .white
-    displayLabel.font = UIFont.systemFont(ofSize: defaultFontSize, weight: .bold)
+    displayLabel.font = UIFont.systemFont(ofSize: currentFontSize, weight: .bold)
     displayLabel.numberOfLines = 0
     displayLabel.lineBreakMode = .byWordWrapping
     displayLabel.isUserInteractionEnabled = true
@@ -63,7 +62,7 @@ final class TextOverlayView: UIView, UITextViewDelegate {
   private func setupEditTextView() {
     editTextView.delegate = self
     editTextView.textAlignment = .center
-    editTextView.font = UIFont.systemFont(ofSize: defaultFontSize, weight: .bold)
+    editTextView.font = UIFont.systemFont(ofSize: currentFontSize, weight: .bold)
     editTextView.textColor = .lightGray
     editTextView.backgroundColor = .clear
     editTextView.isScrollEnabled = false
@@ -73,16 +72,64 @@ final class TextOverlayView: UIView, UITextViewDelegate {
     addSubview(editTextView)
   }
   
+  private func setupFontSlider(in containerView: UIView) {
+    let sliderLength = containerView.bounds.height / 3  // Adjust length for top half
+    let slider = UISlider(frame: CGRect(x: 0, y: 0, width: sliderLength, height: 30))
+
+    slider.minimumValue = Float(minFontSize)
+    slider.maximumValue = Float(maxFontSize)
+    slider.value = Float(currentFontSize)
+    
+    // Rotate 90 degrees counterclockwise
+    slider.transform = CGAffineTransform(rotationAngle: -.pi / 2)
+
+    // Position with transform translation
+    let xPosition: CGFloat = 20 // flush left with padding
+    let yPosition: CGFloat = (containerView.bounds.height / 4) + 40 // center of top half + 40 padding
+    slider.center = CGPoint(x: xPosition, y: yPosition)
+    
+    // Customize thumb
+    let thumbSize: CGFloat = 18
+    let thumbImage = UIGraphicsImageRenderer(size: CGSize(width: thumbSize, height: thumbSize)).image { ctx in
+      UIColor.white.setFill()
+      ctx.cgContext.fillEllipse(in: CGRect(origin: .zero, size: CGSize(width: thumbSize, height: thumbSize)))
+    }
+    slider.setThumbImage(thumbImage, for: .normal)
+    
+    // Track colors
+    slider.minimumTrackTintColor = .white
+    slider.maximumTrackTintColor = UIColor.white.withAlphaComponent(0.3)
+    
+    slider.addTarget(self, action: #selector(fontSliderChanged(_:)), for: .valueChanged)
+    
+    containerView.addSubview(slider)
+    self.fontSlider = slider
+  }
+
+  
+  private func removeFontSlider() {
+    fontSlider?.removeFromSuperview()
+    fontSlider = nil
+  }
+  
+  // MARK: - Font Size Change
+  @objc private func fontSliderChanged(_ sender: UISlider) {
+    currentFontSize = CGFloat(sender.value)
+    displayLabel.font = UIFont.systemFont(ofSize: currentFontSize, weight: .bold)
+    editTextView.font = displayLabel.font
+    adjustHeightForText(editTextView.text)
+  }
+  
   private func setupGestures() {
     let panGesture = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
-    let pinchGesture = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
     let rotateGesture = UIRotationGestureRecognizer(target: self, action: #selector(handleRotate(_:)))
+    let pinchGesture = UIPinchGestureRecognizer(target: self, action: #selector(handleScale(_:)))
     let doubleTapGesture = UITapGestureRecognizer(target: self, action: #selector(handleDoubleTap(_:)))
     doubleTapGesture.numberOfTapsRequired = 2
     
     addGestureRecognizer(panGesture)
-    addGestureRecognizer(pinchGesture)
     addGestureRecognizer(rotateGesture)
+    addGestureRecognizer(pinchGesture)
     addGestureRecognizer(doubleTapGesture)
   }
   
@@ -108,6 +155,7 @@ final class TextOverlayView: UIView, UITextViewDelegate {
     editTextView.textColor = editTextView.text == placeholder ? .lightGray : .white
     
     addDismissLayer(to: containerView)
+    setupFontSlider(in: containerView)
     
     let editWidth = logicalTextWidth ?? (containerView.bounds.width - 40)
     frame.size.width = editWidth
@@ -137,6 +185,7 @@ final class TextOverlayView: UIView, UITextViewDelegate {
     displayLabel.text = finalText.isEmpty || finalText == placeholder ? "" : finalText
     
     dismissLayer?.removeFromSuperview()
+    removeFontSlider()
     
     if savedCenter == .zero {
       savedCenter = superview?.center ?? .zero
@@ -161,17 +210,15 @@ final class TextOverlayView: UIView, UITextViewDelegate {
   
   // MARK: - Helpers
   private func editingPosition(in containerView: UIView) -> CGPoint {
-    // Middle of the top third
     return CGPoint(x: containerView.bounds.midX, y: containerView.bounds.height / 3)
   }
   
   private func adjustHeightForText(_ text: String) {
-    // Measure text
     let maxSize = CGSize(width: frame.width, height: .greatestFiniteMagnitude)
     let boundingRect = (text as NSString).boundingRect(
       with: maxSize,
       options: .usesLineFragmentOrigin,
-      attributes: [.font: displayLabel.font ?? UIFont.systemFont(ofSize: defaultFontSize)],
+      attributes: [.font: displayLabel.font ?? UIFont.systemFont(ofSize: currentFontSize)],
       context: nil
     )
     
@@ -179,21 +226,6 @@ final class TextOverlayView: UIView, UITextViewDelegate {
     newFrame.size.height = boundingRect.height + 10
     frame = newFrame
     
-    // Adjust font size if too many lines
-    let lineHeight = displayLabel.font.lineHeight
-    let lineCount = Int(ceil(boundingRect.height / lineHeight))
-    
-    if lineCount > maxLinesBeforeScaling {
-      let scale = CGFloat(maxLinesBeforeScaling) / CGFloat(lineCount)
-      let newFontSize = max(minFontSize, defaultFontSize * scale)
-      displayLabel.font = UIFont.systemFont(ofSize: newFontSize, weight: .bold)
-      editTextView.font = displayLabel.font
-    } else {
-      displayLabel.font = UIFont.systemFont(ofSize: defaultFontSize, weight: .bold)
-      editTextView.font = displayLabel.font
-    }
-    
-    // Keep vertically centered in top third
     if let containerView = superview {
       center = editingPosition(in: containerView)
     }
@@ -220,17 +252,18 @@ final class TextOverlayView: UIView, UITextViewDelegate {
     savedCenter = center
   }
   
-  @objc private func handlePinch(_ gesture: UIPinchGestureRecognizer) {
-    guard !isEditingMode else { return }
-    transform = transform.scaledBy(x: gesture.scale, y: gesture.scale)
-    gesture.scale = 1
-    savedTransform = transform
-  }
-  
   @objc private func handleRotate(_ gesture: UIRotationGestureRecognizer) {
     guard !isEditingMode else { return }
     transform = transform.rotated(by: gesture.rotation)
     gesture.rotation = 0
+    savedTransform = transform
+  }
+
+  @objc private func handleScale(_ gesture: UIPinchGestureRecognizer) {
+    guard !isEditingMode else { return }
+    let scale = gesture.scale
+    transform = transform.scaledBy(x: scale, y: scale)
+    gesture.scale = 1.0
     savedTransform = transform
   }
   
@@ -249,7 +282,6 @@ final class TextOverlayView: UIView, UITextViewDelegate {
   }
   
   func textViewDidChange(_ textView: UITextView) {
-    // Enforce character limit
     if textView.text.count > characterLimit {
       textView.text = String(textView.text.prefix(characterLimit))
     }
