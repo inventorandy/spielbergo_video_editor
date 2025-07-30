@@ -7,6 +7,8 @@ final class TextOverlayView: UIView, UITextViewDelegate {
   private let editTextView = UITextView()
   private var dismissLayer: UIButton?
   private var fontSlider: UISlider?
+  private var colorPicker: ColorPickerView?
+  private var paintButton: UIButton?
 
   // MARK: - State
   private var isEditingMode = true
@@ -66,6 +68,107 @@ final class TextOverlayView: UIView, UITextViewDelegate {
     addSubview(editTextView)
   }
 
+  // MARK: - Toolbar Button
+  private func setupPaintButton(in containerView: UIView) {
+    let button = UIButton(type: .system)
+    button.setImage(UIImage(systemName: "paintpalette.fill"), for: .normal)
+    button.tintColor = .white
+    button.frame = CGRect(x: 64, y: containerView.safeAreaInsets.top + 16, width: 32, height: 32)
+    button.addTarget(self, action: #selector(toggleColorPicker), for: .touchUpInside)
+    containerView.addSubview(button)
+    paintButton = button
+  }
+
+  private func removePaintButton() {
+    paintButton?.removeFromSuperview()
+    paintButton = nil
+  }
+
+  @objc private func toggleColorPicker() {
+    guard let containerView = superview else { return }
+    if let picker = colorPicker {
+      picker.hide()
+      colorPicker = nil
+      return
+    }
+
+    let picker = ColorPickerView()
+    picker.onColorSelected = { [weak self] color in
+      self?.displayLabel.textColor = color
+      self?.editTextView.textColor = color
+    }
+    print("Container Height: \(containerView.bounds.height)")
+    let yPosition = containerView.bounds.height - 400 // Position above keyboard (approx)
+    print("Color Picker Y Position: \(yPosition)")
+    picker.show(in: containerView, at: CGPoint(x: 20, y: yPosition), width: containerView.bounds.width - 40, height: 50)
+    colorPicker = picker
+  }
+
+  // MARK: - Edit Mode
+  func enterEditMode(initialText: String? = nil, animated: Bool = true) {
+    guard let containerView = superview else { return }
+
+    if !isEditingMode {
+      savedCenter = center
+    }
+
+    isEditingMode = true
+    editTextView.isHidden = false
+    displayLabel.isHidden = true
+    editTextView.text = initialText ?? displayLabel.text ?? placeholder
+    editTextView.textColor = editTextView.text == placeholder ? .lightGray : .white
+
+    // Reset transform for editing
+    self.transform = .identity
+    self.bounds = CGRect(x: 0, y: 0, width: containerView.bounds.width - 40, height: containerView.bounds.height / 3)
+    self.center = containerView.center
+
+    addDismissLayer(to: containerView)
+    setupFontSlider(in: containerView)
+    setupPaintButton(in: containerView)
+
+    editTextView.font = displayLabel.font
+    editTextView.becomeFirstResponder()
+  }
+
+  func exitEditMode(animated: Bool = true) {
+    isEditingMode = false
+    editTextView.resignFirstResponder()
+
+    let finalText = editTextView.text.trimmingCharacters(in: .whitespacesAndNewlines)
+    displayLabel.text = finalText.isEmpty || finalText == placeholder ? "" : finalText
+
+    dismissLayer?.removeFromSuperview()
+    removeFontSlider()
+    removePaintButton()
+    colorPicker?.hide()
+    colorPicker = nil
+
+    if savedCenter == .zero, let superview = superview {
+      savedCenter = superview.center
+    }
+
+    self.center = savedCenter
+    self.transform = CGAffineTransform(rotationAngle: savedRotation).scaledBy(x: savedScale, y: savedScale)
+
+    editTextView.isHidden = true
+    displayLabel.isHidden = false
+  }
+
+  // MARK: - Helpers
+  private func addDismissLayer(to containerView: UIView) {
+    let dismissButton = UIButton(frame: containerView.bounds)
+    dismissButton.backgroundColor = .clear
+    dismissButton.addTarget(self, action: #selector(dismissEditing), for: .touchUpInside)
+    containerView.insertSubview(dismissButton, belowSubview: self)
+    self.dismissLayer = dismissButton
+  }
+
+  @objc private func dismissEditing() {
+    exitEditMode(animated: true)
+  }
+
+  // MARK: - Font Slider
   private func setupFontSlider(in containerView: UIView) {
     let sliderHeight = containerView.bounds.height / 3
     let slider = UISlider(frame: CGRect(x: 0, y: 0, width: sliderHeight, height: 30))
@@ -77,7 +180,6 @@ final class TextOverlayView: UIView, UITextViewDelegate {
     slider.transform = CGAffineTransform(rotationAngle: -.pi / 2)
     slider.center = CGPoint(x: 20, y: ((containerView.bounds.height / 4 ) + 48.0))
 
-    // Custom thumb
     let thumbSize: CGFloat = 18
     let thumbImage = UIGraphicsImageRenderer(size: CGSize(width: thumbSize, height: thumbSize)).image { ctx in
       UIColor.white.setFill()
@@ -99,7 +201,6 @@ final class TextOverlayView: UIView, UITextViewDelegate {
     fontSlider = nil
   }
 
-  // MARK: - Font Slider Change
   @objc private func fontSliderChanged(_ sender: UISlider) {
     currentFontSize = CGFloat(sender.value)
     displayLabel.font = UIFont.systemFont(ofSize: currentFontSize, weight: .bold)
@@ -124,68 +225,6 @@ final class TextOverlayView: UIView, UITextViewDelegate {
     super.layoutSubviews()
     displayLabel.frame = bounds
     editTextView.frame = bounds
-  }
-
-  // MARK: - Edit Mode
-  func enterEditMode(initialText: String? = nil, animated: Bool = true) {
-    guard let containerView = superview else { return }
-
-    if !isEditingMode {
-      savedCenter = center
-    }
-
-    isEditingMode = true
-    editTextView.isHidden = false
-    displayLabel.isHidden = true
-    editTextView.text = initialText ?? displayLabel.text ?? placeholder
-    editTextView.textColor = editTextView.text == placeholder ? .lightGray : .white
-
-    // Reset transform for editing
-    self.transform = .identity
-    self.bounds = CGRect(x: 0, y: 0, width: containerView.bounds.width - 40, height: containerView.bounds.height / 3)
-    self.center = containerView.center
-
-    addDismissLayer(to: containerView)
-    setupFontSlider(in: containerView)
-
-    editTextView.font = displayLabel.font
-    editTextView.becomeFirstResponder()
-  }
-
-  func exitEditMode(animated: Bool = true) {
-    isEditingMode = false
-    editTextView.resignFirstResponder()
-
-    let finalText = editTextView.text.trimmingCharacters(in: .whitespacesAndNewlines)
-    displayLabel.text = finalText.isEmpty || finalText == placeholder ? "" : finalText
-
-    dismissLayer?.removeFromSuperview()
-    removeFontSlider()
-
-    // Default center if user hasn't moved
-    if savedCenter == .zero, let superview = superview {
-      savedCenter = superview.center
-    }
-
-    // Apply user transforms
-    self.center = savedCenter
-    self.transform = CGAffineTransform(rotationAngle: savedRotation).scaledBy(x: savedScale, y: savedScale)
-
-    editTextView.isHidden = true
-    displayLabel.isHidden = false
-  }
-
-  // MARK: - Helpers
-  private func addDismissLayer(to containerView: UIView) {
-    let dismissButton = UIButton(frame: containerView.bounds)
-    dismissButton.backgroundColor = .clear
-    dismissButton.addTarget(self, action: #selector(dismissEditing), for: .touchUpInside)
-    containerView.insertSubview(dismissButton, belowSubview: self)
-    self.dismissLayer = dismissButton
-  }
-
-  @objc private func dismissEditing() {
-    exitEditMode(animated: true)
   }
 
   // MARK: - Gesture Handlers
@@ -236,12 +275,10 @@ final class TextOverlayView: UIView, UITextViewDelegate {
   }
 
   func textView(_ textView: UITextView,
-              shouldChangeTextIn range: NSRange,
-              replacementText text: String) -> Bool {
+                shouldChangeTextIn range: NSRange,
+                replacementText text: String) -> Bool {
     // Block enter key (new lines)
-    if text == "\n" {
-        return false
-    }
+    if text == "\n" { return false }
     return true
   }
 }
