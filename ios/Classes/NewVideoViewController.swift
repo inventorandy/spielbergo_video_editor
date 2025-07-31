@@ -162,7 +162,7 @@ class NewVideoViewController: UIViewController {
       view.layer.addSublayer(layer)
       self.previewLayer = layer
 
-      Task { @MainActor in
+      DispatchQueue.global(qos: .userInitiated).async {
         self.captureSession.startRunning()
       }
     } catch {
@@ -615,16 +615,18 @@ class NewVideoViewController: UIViewController {
   /// Visibility Handlers
   // Handle all visibility of UI elements based on recording state
   private func updateUIVisibility() {
-    // Done Button
-    toggleDoneButtonVisibility()
-    // Record Button
-    toggleRecordButtonVisibility()
-    // Delete Button
-    toggleDeleteButtonVisibility()
-    // Switch Button
-    toggleSwitchCameraButtonVisibility()
-    // Time Selector
-    toggleTimeSelectorVisibility()
+    DispatchQueue.main.async {
+      // Done Button
+      self.toggleDoneButtonVisibility()
+      // Record Button
+      self.toggleRecordButtonVisibility()
+      // Delete Button
+      self.toggleDeleteButtonVisibility()
+      // Switch Button
+      self.toggleSwitchCameraButtonVisibility()
+      // Time Selector
+      self.toggleTimeSelectorVisibility()
+    }
   }
 
   // Handle angle of the progress layer based recorded duration

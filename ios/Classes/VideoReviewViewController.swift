@@ -144,15 +144,15 @@ class VideoReviewViewController: UIViewController {
       return
     }
 
-    if textOverlays.isEmpty {
-      dismissEditor()
-    } else {
+    textOverlays.forEach { $0.exitEditMode(animated: false) }
+    view.endEditing(true) // 👈 Kill any active text input
+    DispatchQueue.main.async {
       let alert = UIAlertController(title: "Discard Changes?", message: "You have unsaved edits. Are you sure you want to discard them?", preferredStyle: .alert)
       alert.addAction(UIAlertAction(title: "Cancel", style: .cancel, handler: nil))
       alert.addAction(UIAlertAction(title: "Discard", style: .destructive, handler: { _ in
         self.dismissEditor()
       }))
-      present(alert, animated: true)
+      self.present(alert, animated: true)
     }
   }
 
@@ -162,7 +162,9 @@ class VideoReviewViewController: UIViewController {
     queuePlayer = nil
     playerLooper = nil
     textOverlays.removeAll()
-    dismiss(animated: true)
+    DispatchQueue.main.async {
+      self.dismiss(animated: true)
+    }
   }
 
   @objc private func addTextTapped() {

@@ -23,7 +23,7 @@ final class TextOverlayView: UIView, UITextViewDelegate {
 
   // MARK: - State
   private var isEditingMode = true
-  private let placeholder = "Tap to type"
+  private let placeholder = "Enter text here..."
 
   private var savedCenter: CGPoint = .zero
   private var savedRotation: CGFloat = 0
@@ -34,6 +34,17 @@ final class TextOverlayView: UIView, UITextViewDelegate {
   private let minFontSize: CGFloat = 16
   private let maxFontSize: CGFloat = 48
   private var currentFontSize: CGFloat = 28
+
+  // Available fonts with readable labels
+  private let fontOptions: [(label: String, fontName: String)] = [
+    ("Modern", "Helvetica"),
+    ("Strong", "Helvetica-Bold"),
+    ("Classic", "TimesNewRomanPS-BoldMT"),
+    ("Elegant", "Georgia-Italic"),
+    ("Script", "Papyrus"),
+    ("Code", "Courier-Bold")
+  ]
+  private var selectedFontIndex = 0
 
   // MARK: - Init
   init(containerView: UIView, initialText: String? = nil, onExit: (() -> Void)? = nil) {
@@ -57,11 +68,19 @@ final class TextOverlayView: UIView, UITextViewDelegate {
     fatalError("init(coder:) has not been implemented")
   }
 
+  private func applyCurrentFont() {
+    let fontName = fontOptions[selectedFontIndex].fontName
+    let font = UIFont(name: fontName, size: currentFontSize) ?? UIFont.systemFont(ofSize: currentFontSize)
+    displayLabel.font = font
+    editTextView.font = font
+  }
+
   // MARK: - Setup
   private func setupDisplayLabel() {
     displayLabel.textAlignment = .center
     displayLabel.textColor = .white
-    displayLabel.font = UIFont.systemFont(ofSize: currentFontSize, weight: .bold)
+    // displayLabel.font = UIFont.systemFont(ofSize: currentFontSize, weight: .bold)
+    displayLabel.font = UIFont(name: fontOptions[selectedFontIndex].fontName, size: currentFontSize) ?? UIFont.systemFont(ofSize: currentFontSize)
     displayLabel.numberOfLines = 0
     displayLabel.lineBreakMode = .byWordWrapping
     displayLabel.isUserInteractionEnabled = true
@@ -71,7 +90,8 @@ final class TextOverlayView: UIView, UITextViewDelegate {
   private func setupEditTextView() {
     editTextView.delegate = self
     editTextView.textAlignment = .center
-    editTextView.font = UIFont.systemFont(ofSize: currentFontSize, weight: .bold)
+    // editTextView.font = UIFont.systemFont(ofSize: currentFontSize, weight: .bold)
+    editTextView.font = UIFont(name: fontOptions[selectedFontIndex].fontName, size: currentFontSize) ?? UIFont.systemFont(ofSize: currentFontSize)
     editTextView.textColor = .lightGray
     editTextView.backgroundColor = .clear
     editTextView.isScrollEnabled = true
@@ -130,7 +150,7 @@ final class TextOverlayView: UIView, UITextViewDelegate {
       self?.editTextView.textColor = color
     }
     let yPosition = containerView.bounds.height - 400 // Position above keyboard (approx)
-    picker.show(in: containerView, at: CGPoint(x: 20, y: yPosition), width: containerView.bounds.width - 40, height: 50)
+    picker.show(in: containerView, at: CGPoint(x: 20, y: yPosition), width: containerView.bounds.width - 40, height: 64)
     colorPicker = picker
   }
 
@@ -146,15 +166,13 @@ final class TextOverlayView: UIView, UITextViewDelegate {
     }
 
     let picker = FontPickerView()
-    picker.setFontSize(currentFontSize)
-    picker.onFontSelected = { [weak self] font in
-      guard let self = self else { return }
-      let updatedFont = font.withSize(self.currentFontSize)
-      self.displayLabel.font = updatedFont
-      self.editTextView.font = updatedFont
+    picker.setFonts(fontOptions, selectedIndex: selectedFontIndex)
+    picker.onFontSelected = { [weak self] index in
+      self?.selectedFontIndex = index
+      self?.applyCurrentFont()
     }
     let yPosition = containerView.bounds.height - 400 // Position above keyboard (approx)
-    picker.show(in: containerView, at: CGPoint(x: 20, y: yPosition), width: containerView.bounds.width - 40, height: 50)
+    picker.show(in: containerView, at: CGPoint(x: 20, y: yPosition), width: containerView.bounds.width - 40, height: 64)
     fontPicker = picker
   }
 
@@ -170,11 +188,12 @@ final class TextOverlayView: UIView, UITextViewDelegate {
     editTextView.isHidden = false
     displayLabel.isHidden = true
     editTextView.text = initialText ?? displayLabel.text ?? placeholder
+    displayLabel.text = initialText ?? placeholder
 
     if displayLabel.textColor != .clear {
       editTextView.textColor = displayLabel.textColor
     } else {
-      editTextView.textColor = editTextView.text == placeholder ? .lightGray : .white
+      editTextView.textColor = .white
     }
 
     self.transform = .identity
@@ -192,31 +211,34 @@ final class TextOverlayView: UIView, UITextViewDelegate {
 
   func exitEditMode(animated: Bool = true) {
     isEditingMode = false
-    editTextView.resignFirstResponder()
+    DispatchQueue.main.async { [weak self] in
+      guard let self = self else { return }
+      self.editTextView.resignFirstResponder()
 
-    let finalText = editTextView.text.trimmingCharacters(in: .whitespacesAndNewlines)
-    displayLabel.text = finalText.isEmpty || finalText == placeholder ? "" : finalText
+      let finalText = self.editTextView.text.trimmingCharacters(in: .whitespacesAndNewlines)
+      self.displayLabel.text = finalText.isEmpty ? placeholder : finalText
 
-    dismissLayer?.removeFromSuperview()
-    removeFontSlider()
-    removePaintButton()
-    removeFontPickerButton()
-    colorPicker?.hide()
-    colorPicker = nil
-    fontPicker?.hide()
-    fontPicker = nil
+      self.dismissLayer?.removeFromSuperview()
+      self.removeFontSlider()
+      self.removePaintButton()
+      self.removeFontPickerButton()
+      self.colorPicker?.hide()
+      self.colorPicker = nil
+      self.fontPicker?.hide()
+      self.fontPicker = nil
 
-    if savedCenter == .zero, let superview = superview {
-      savedCenter = superview.center
+      if self.savedCenter == .zero, let superview = self.superview {
+      self.savedCenter = superview.center
+      }
+
+      self.center = self.savedCenter
+      self.transform = CGAffineTransform(rotationAngle: self.savedRotation).scaledBy(x: self.savedScale, y: self.savedScale)
+
+      self.editTextView.isHidden = true
+      self.displayLabel.isHidden = false
+
+      self.onExit?()
     }
-
-    self.center = savedCenter
-    self.transform = CGAffineTransform(rotationAngle: savedRotation).scaledBy(x: savedScale, y: savedScale)
-
-    editTextView.isHidden = true
-    displayLabel.isHidden = false
-
-    self.onExit?()
   }
 
   // MARK: - Helpers
@@ -266,12 +288,7 @@ final class TextOverlayView: UIView, UITextViewDelegate {
 
   @objc private func fontSliderChanged(_ sender: UISlider) {
     currentFontSize = CGFloat(sender.value)
-
-    let currentFontName = displayLabel.font.fontName
-    let newFont = UIFont(name: currentFontName, size: currentFontSize) ?? UIFont.systemFont(ofSize: currentFontSize, weight: .bold)
-
-    displayLabel.font = newFont
-    editTextView.font = newFont
+    applyCurrentFont()
   }
 
   private func setupGestures() {
@@ -334,12 +351,12 @@ final class TextOverlayView: UIView, UITextViewDelegate {
   }
 
   // MARK: - UITextViewDelegate
-  func textViewDidBeginEditing(_ textView: UITextView) {
-    if textView.text == placeholder {
-      textView.text = ""
-      textView.textColor = .white
-    }
-  }
+  // func textViewDidBeginEditing(_ textView: UITextView) {
+  //   // if textView.text == placeholder {
+  //   //   textView.text = ""
+  //   //   textView.textColor = .white
+  //   // }
+  // }
 
   func textViewDidChange(_ textView: UITextView) {
     if textView.text.count > characterLimit {

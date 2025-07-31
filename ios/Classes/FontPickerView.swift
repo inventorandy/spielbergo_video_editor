@@ -2,20 +2,14 @@ import UIKit
 
 final class FontPickerView: UIView {
 
-  // Callback when a font is selected
-  var onFontSelected: ((UIFont) -> Void)?
+  var onFontSelected: ((Int) -> Void)?
 
-  // Available fonts with readable labels
-  private let fonts: [(label: String, fontName: String)] = [
-    ("Modern", "Helvetica"),
-    ("Strong", "Helvetica-Bold"),
-    ("Classic", "TimesNewRomanPS-BoldMT"),
-    ("Elegant", "Georgia-Italic"),
-    ("Script", "Papyrus"),
-    ("Code", "Courier-Bold")
-  ]
-
+  private var fonts: [(label: String, fontName: String)] = []
+  private var selectedFontIndex: Int = 0
   private var previewFontSize: CGFloat = 16
+
+  private let scrollView = UIScrollView()
+  private let stack = UIStackView()
 
   override init(frame: CGRect) {
     super.init(frame: frame)
@@ -31,31 +25,13 @@ final class FontPickerView: UIView {
     layer.cornerRadius = 8
     clipsToBounds = true
 
-    let scrollView = UIScrollView()
     scrollView.showsHorizontalScrollIndicator = false
     scrollView.translatesAutoresizingMaskIntoConstraints = false
 
-    let stack = UIStackView()
     stack.axis = .horizontal
     stack.alignment = .center
     stack.spacing = 12
     stack.translatesAutoresizingMaskIntoConstraints = false
-
-    for (index, fontInfo) in fonts.enumerated() {
-      let font = UIFont(name: fontInfo.fontName, size: previewFontSize) ?? UIFont.systemFont(ofSize: previewFontSize)
-      let button = UIButton(type: .system)
-      button.setTitle(fontInfo.label, for: .normal)
-      button.titleLabel?.font = font
-      button.setTitleColor(.white, for: .normal)
-      button.backgroundColor = UIColor.darkGray.withAlphaComponent(0.6)
-      button.layer.cornerRadius = 8
-      button.contentEdgeInsets = UIEdgeInsets(top: 4, left: 12, bottom: 4, right: 12)
-      button.tag = index
-      button.addTarget(self, action: #selector(fontTapped(_:)), for: .touchUpInside)
-      button.translatesAutoresizingMaskIntoConstraints = false
-      button.heightAnchor.constraint(equalToConstant: 36).isActive = true // Fixed height
-      stack.addArrangedSubview(button)
-    }
 
     scrollView.addSubview(stack)
     addSubview(scrollView)
@@ -74,11 +50,36 @@ final class FontPickerView: UIView {
     ])
   }
 
+  func setFonts(_ fonts: [(label: String, fontName: String)], selectedIndex: Int = 0) {
+    self.fonts = fonts
+    self.selectedFontIndex = selectedIndex
+    refreshFontButtons()
+  }
+
+  private func refreshFontButtons() {
+    stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+
+    for (index, fontInfo) in fonts.enumerated() {
+      let font = UIFont(name: fontInfo.fontName, size: previewFontSize) ?? UIFont.systemFont(ofSize: previewFontSize)
+      let button = UIButton(type: .system)
+      button.setTitle(fontInfo.label, for: .normal)
+      button.titleLabel?.font = font
+      button.setTitleColor(.white, for: .normal)
+      button.backgroundColor = UIColor.darkGray.withAlphaComponent(0.6)
+      button.layer.cornerRadius = 8
+      button.contentEdgeInsets = UIEdgeInsets(top: 4, left: 12, bottom: 4, right: 12)
+      button.tag = index
+      button.addTarget(self, action: #selector(fontTapped(_:)), for: .touchUpInside)
+      button.translatesAutoresizingMaskIntoConstraints = false
+      button.heightAnchor.constraint(equalToConstant: 36).isActive = true // Fixed height
+      stack.addArrangedSubview(button)
+    }
+  }
+
   @objc private func fontTapped(_ sender: UIButton) {
     let index = sender.tag
-    let fontName = fonts[index].fontName
-    let font = UIFont(name: fontName, size: previewFontSize) ?? UIFont.systemFont(ofSize: previewFontSize)
-    onFontSelected?(font)
+    selectedFontIndex = index
+    onFontSelected?(index)
   }
 
   func show(in containerView: UIView, at position: CGPoint, width: CGFloat = 300, height: CGFloat = 50) {
@@ -95,9 +96,5 @@ final class FontPickerView: UIView {
     }) { _ in
       self.removeFromSuperview()
     }
-  }
-
-  func setFontSize(_ size: CGFloat) {
-    self.previewFontSize = size
   }
 }
