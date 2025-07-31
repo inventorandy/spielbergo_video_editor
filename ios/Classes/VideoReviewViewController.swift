@@ -22,6 +22,10 @@ class VideoReviewViewController: UIViewController {
   // Flags
   private var isAddingElement: Bool = false
 
+  // Text overlays
+  private var textOverlays: [TextOverlayView] = []
+  private var deleteBinView: UIImageView!
+
   // Required initializer for Storyboards
   required init?(coder: NSCoder) {
     fatalError("init(coder:) has not been implemented")
@@ -50,6 +54,7 @@ class VideoReviewViewController: UIViewController {
     setupVideoPlayer()
     setupCloseButton()
     setupAddTextButton()
+    setupDeleteBinView()
   }
 
   override func viewDidLayoutSubviews() {
@@ -106,12 +111,10 @@ class VideoReviewViewController: UIViewController {
     self.addTextButton.setImage(image, for: .normal)
     self.addTextButton.tintColor = .white
 
-    // Remove extra padding around image
     self.addTextButton.contentEdgeInsets = .zero
     self.addTextButton.imageEdgeInsets = .zero
     self.addTextButton.imageView?.contentMode = .scaleAspectFit
 
-    // Optional: round background
     self.addTextButton.layer.cornerRadius = 8
     self.addTextButton.clipsToBounds = true
 
@@ -130,8 +133,23 @@ class VideoReviewViewController: UIViewController {
       self.addTextButton.heightAnchor.constraint(equalToConstant: 36)
     ])
 
-    // Add the target action for the Switch Camera Button
     self.addTextButton.addTarget(self, action: #selector(addTextTapped), for: .touchUpInside)
+  }
+
+  private func setupDeleteBinView() {
+    deleteBinView = UIImageView(image: UIImage(systemName: "trash.circle.fill"))
+    deleteBinView.tintColor = .white
+    deleteBinView.alpha = 0
+    deleteBinView.contentMode = .scaleAspectFit
+    deleteBinView.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(deleteBinView)
+
+    NSLayoutConstraint.activate([
+      deleteBinView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+      deleteBinView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -20),
+      deleteBinView.widthAnchor.constraint(equalToConstant: 60),
+      deleteBinView.heightAnchor.constraint(equalToConstant: 60)
+    ])
   }
 
   /// Button Actions
@@ -147,35 +165,76 @@ class VideoReviewViewController: UIViewController {
   @objc private func addTextTapped() {
     isAddingElement = true
     updateUIElements()
-    _ = TextOverlayView(containerView: view, onExit: { [weak self] in
+    let overlay = TextOverlayView(containerView: view, onExit: { [weak self] in
       self?.isAddingElement = false
       self?.updateUIElements()
     })
+    overlay.dragDelegate = self
+    textOverlays.append(overlay)
   }
 
   // MARK: - Update UI
   func updateUIElements() {
-    // Update the visibility of buttons based on the isAddingElement flag
-    // Do this on the main thread to ensure UI updates are smooth
     DispatchQueue.main.async {
-      if self.isAddingElement {
-        // Disable buttons while adding text
-        self.closeButton.isHidden = true
-        self.addTextButton.isHidden = true
-      } else {
-        // Enable buttons when not adding text
-        self.closeButton.isHidden = false
-        self.addTextButton.isHidden = false
-      }
+      self.closeButton.isHidden = self.isAddingElement
+      self.addTextButton.isHidden = self.isAddingElement
     }
   }
 
   // MARK: - Deinit
   deinit {
-    // Clean up player resources
     queuePlayer?.pause()
     playerLayer.removeFromSuperlayer()
     queuePlayer = nil
     playerLooper = nil
+  }
+}
+
+extension VideoReviewViewController: TextOverlayDragDelegate {
+  func textOverlay(_ overlay: TextOverlayView, didStartDragging gesture: UIPanGestureRecognizer) {
+    UIView.animate(withDuration: 0.2) {
+      self.deleteBinView.alpha = 1
+      self.deleteBinView.transform = .identity
+    }
+  }
+
+  func textOverlay(_ overlay: TextOverlayView, didContinueDragging gesture: UIPanGestureRecognizer) {
+    let location = gesture.location(in: view)
+    let binFrame = deleteBinView.frame.insetBy(dx: -20, dy: -20)
+
+    if binFrame.contains(location) {
+      UIView.animate(withDuration: 0.1) {
+        self.deleteBinView.transform = CGAffineTransform(scaleX: 1.2, y: 1.2)
+        self.deleteBinView.tintColor = .red
+      }
+    } else {
+      UIView.animate(withDuration: 0.1) {
+        self.deleteBinView.transform = .identity
+        self.deleteBinView.tintColor = .white
+      }
+    }
+  }
+
+  func textOverlay(_ overlay: TextOverlayView, didEndDragging gesture: UIPanGestureRecognizer) {
+    let location = gesture.location(in: view)
+    let binFrame = deleteBinView.frame.insetBy(dx: -20, dy: -20)
+
+    if binFrame.contains(location) {
+      UIView.animate(withDuration: 0.2, animations: {
+        overlay.alpha = 0
+        overlay.transform = CGAffineTransform(scaleX: 0.1, y: 0.1)
+      }, completion: { _ in
+        overlay.removeFromSuperview()
+        if let index = self.textOverlays.firstIndex(of: overlay) {
+          self.textOverlays.remove(at: index)
+        }
+      })
+    }
+
+    UIView.animate(withDuration: 0.2) {
+      self.deleteBinView.alpha = 0
+      self.deleteBinView.transform = .identity
+      self.deleteBinView.tintColor = .white
+    }
   }
 }

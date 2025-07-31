@@ -1,8 +1,15 @@
 import UIKit
 
+protocol TextOverlayDragDelegate: AnyObject {
+  func textOverlay(_ overlay: TextOverlayView, didStartDragging gesture: UIPanGestureRecognizer)
+  func textOverlay(_ overlay: TextOverlayView, didContinueDragging gesture: UIPanGestureRecognizer)
+  func textOverlay(_ overlay: TextOverlayView, didEndDragging gesture: UIPanGestureRecognizer)
+}
+
 final class TextOverlayView: UIView, UITextViewDelegate {
   // MARK: - Callbacks
   var onExit: (() -> Void)?
+  weak var dragDelegate: TextOverlayDragDelegate?
 
   // MARK: - Subviews
   private let displayLabel = UILabel()
@@ -101,7 +108,9 @@ final class TextOverlayView: UIView, UITextViewDelegate {
       self?.displayLabel.textColor = color
       self?.editTextView.textColor = color
     }
+    print("Container Height: \(containerView.bounds.height)")
     let yPosition = containerView.bounds.height - 400 // Position above keyboard (approx)
+    print("Color Picker Y Position: \(yPosition)")
     picker.show(in: containerView, at: CGPoint(x: 20, y: yPosition), width: containerView.bounds.width - 40, height: 50)
     colorPicker = picker
   }
@@ -119,14 +128,12 @@ final class TextOverlayView: UIView, UITextViewDelegate {
     displayLabel.isHidden = true
     editTextView.text = initialText ?? displayLabel.text ?? placeholder
 
-    // Preserve the previously set text color
     if displayLabel.textColor != .clear {
       editTextView.textColor = displayLabel.textColor
     } else {
       editTextView.textColor = editTextView.text == placeholder ? .lightGray : .white
     }
 
-    // Reset transform for editing
     self.transform = .identity
     self.bounds = CGRect(x: 0, y: 0, width: containerView.bounds.width - 40, height: containerView.bounds.height / 3)
     self.center = containerView.center
@@ -178,7 +185,6 @@ final class TextOverlayView: UIView, UITextViewDelegate {
     exitEditMode(animated: true)
   }
 
-  // MARK: - Font Slider
   private func setupFontSlider(in containerView: UIView) {
     let sliderHeight = containerView.bounds.height / 3
     let slider = UISlider(frame: CGRect(x: 0, y: 0, width: sliderHeight, height: 30))
@@ -217,7 +223,6 @@ final class TextOverlayView: UIView, UITextViewDelegate {
     editTextView.font = displayLabel.font
   }
 
-  // MARK: - Gestures
   private func setupGestures() {
     let panGesture = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
     let rotateGesture = UIRotationGestureRecognizer(target: self, action: #selector(handleRotate(_:)))
@@ -240,10 +245,21 @@ final class TextOverlayView: UIView, UITextViewDelegate {
   // MARK: - Gesture Handlers
   @objc private func handlePan(_ gesture: UIPanGestureRecognizer) {
     guard !isEditingMode else { return }
-    let translation = gesture.translation(in: superview)
-    center = CGPoint(x: center.x + translation.x, y: center.y + translation.y)
-    gesture.setTranslation(.zero, in: superview)
-    savedCenter = center
+
+    switch gesture.state {
+    case .began:
+      dragDelegate?.textOverlay(self, didStartDragging: gesture)
+    case .changed:
+      let translation = gesture.translation(in: superview)
+      center = CGPoint(x: center.x + translation.x, y: center.y + translation.y)
+      gesture.setTranslation(.zero, in: superview)
+      savedCenter = center
+      dragDelegate?.textOverlay(self, didContinueDragging: gesture)
+    case .ended, .cancelled:
+      dragDelegate?.textOverlay(self, didEndDragging: gesture)
+    default:
+      break
+    }
   }
 
   @objc private func handleRotate(_ gesture: UIRotationGestureRecognizer) {
@@ -284,11 +300,7 @@ final class TextOverlayView: UIView, UITextViewDelegate {
     exitEditMode()
   }
 
-  func textView(_ textView: UITextView,
-                shouldChangeTextIn range: NSRange,
-                replacementText text: String) -> Bool {
-    // Block enter key (new lines)
-    if text == "\n" { return false }
-    return true
+  func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
+    return text != "\n"
   }
 }
