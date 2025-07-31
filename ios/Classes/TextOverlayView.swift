@@ -17,7 +17,9 @@ final class TextOverlayView: UIView, UITextViewDelegate {
   private var dismissLayer: UIButton?
   private var fontSlider: UISlider?
   private var colorPicker: ColorPickerView?
+  private var fontPicker: FontPickerView?
   private var paintButton: UIButton?
+  private var fontPickerButton: UIButton?
 
   // MARK: - State
   private var isEditingMode = true
@@ -95,8 +97,27 @@ final class TextOverlayView: UIView, UITextViewDelegate {
     paintButton = nil
   }
 
+  private func setupFontPickerButton(in containerView: UIView) {
+    let button = UIButton(type: .system)
+    button.setImage(UIImage(systemName: "textformat.size"), for: .normal)
+    button.tintColor = .white
+    button.frame = CGRect(x: 112, y: containerView.safeAreaInsets.top + 16, width: 32, height: 32)
+    button.addTarget(self, action: #selector(toggleFontPicker), for: .touchUpInside)
+    containerView.addSubview(button)
+    fontPickerButton = button
+  }
+
+  private func removeFontPickerButton() {
+    fontPickerButton?.removeFromSuperview()
+    fontPickerButton = nil
+  }
+
+  // MARK: - Toggle Pickers
   @objc private func toggleColorPicker() {
     guard let containerView = superview else { return }
+    fontPicker?.hide()
+    fontPicker = nil
+
     if let picker = colorPicker {
       picker.hide()
       colorPicker = nil
@@ -111,6 +132,30 @@ final class TextOverlayView: UIView, UITextViewDelegate {
     let yPosition = containerView.bounds.height - 400 // Position above keyboard (approx)
     picker.show(in: containerView, at: CGPoint(x: 20, y: yPosition), width: containerView.bounds.width - 40, height: 50)
     colorPicker = picker
+  }
+
+  @objc private func toggleFontPicker() {
+    guard let containerView = superview else { return }
+    colorPicker?.hide()
+    colorPicker = nil
+
+    if let picker = fontPicker {
+      picker.hide()
+      fontPicker = nil
+      return
+    }
+
+    let picker = FontPickerView()
+    picker.setFontSize(currentFontSize)
+    picker.onFontSelected = { [weak self] font in
+      guard let self = self else { return }
+      let updatedFont = font.withSize(self.currentFontSize)
+      self.displayLabel.font = updatedFont
+      self.editTextView.font = updatedFont
+    }
+    let yPosition = containerView.bounds.height - 400 // Position above keyboard (approx)
+    picker.show(in: containerView, at: CGPoint(x: 20, y: yPosition), width: containerView.bounds.width - 40, height: 50)
+    fontPicker = picker
   }
 
   // MARK: - Edit Mode
@@ -139,6 +184,7 @@ final class TextOverlayView: UIView, UITextViewDelegate {
     addDismissLayer(to: containerView)
     setupFontSlider(in: containerView)
     setupPaintButton(in: containerView)
+    setupFontPickerButton(in: containerView)
 
     editTextView.font = displayLabel.font
     editTextView.becomeFirstResponder()
@@ -154,6 +200,7 @@ final class TextOverlayView: UIView, UITextViewDelegate {
     dismissLayer?.removeFromSuperview()
     removeFontSlider()
     removePaintButton()
+    removeFontPickerButton()
     colorPicker?.hide()
     colorPicker = nil
 
@@ -217,8 +264,12 @@ final class TextOverlayView: UIView, UITextViewDelegate {
 
   @objc private func fontSliderChanged(_ sender: UISlider) {
     currentFontSize = CGFloat(sender.value)
-    displayLabel.font = UIFont.systemFont(ofSize: currentFontSize, weight: .bold)
-    editTextView.font = displayLabel.font
+
+    let currentFontName = displayLabel.font.fontName
+    let newFont = UIFont(name: currentFontName, size: currentFontSize) ?? UIFont.systemFont(ofSize: currentFontSize, weight: .bold)
+
+    displayLabel.font = newFont
+    editTextView.font = newFont
   }
 
   private func setupGestures() {
