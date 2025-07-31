@@ -203,6 +203,8 @@ final class TextOverlayView: UIView, UITextViewDelegate {
     removeFontPickerButton()
     colorPicker?.hide()
     colorPicker = nil
+    fontPicker?.hide()
+    fontPicker = nil
 
     if savedCenter == .zero, let superview = superview {
       savedCenter = superview.center

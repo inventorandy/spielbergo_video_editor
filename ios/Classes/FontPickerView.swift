@@ -7,13 +7,15 @@ final class FontPickerView: UIView {
 
   // Available fonts with readable labels
   private let fonts: [(label: String, fontName: String)] = [
-    ("Sans", "Helvetica"),
-    ("Serif", "Times New Roman"),
-    ("Display", "Papyrus"),
-    ("Mono", "Courier")
+    ("Modern", "Helvetica"),
+    ("Strong", "Helvetica-Bold"),
+    ("Classic", "TimesNewRomanPS-BoldMT"),
+    ("Elegant", "Georgia-Italic"),
+    ("Script", "Papyrus"),
+    ("Code", "Courier-Bold")
   ]
 
-  private var previewFontSize: CGFloat = 20
+  private var previewFontSize: CGFloat = 16
 
   override init(frame: CGRect) {
     super.init(frame: frame)
@@ -50,6 +52,8 @@ final class FontPickerView: UIView {
       button.contentEdgeInsets = UIEdgeInsets(top: 4, left: 12, bottom: 4, right: 12)
       button.tag = index
       button.addTarget(self, action: #selector(fontTapped(_:)), for: .touchUpInside)
+      button.translatesAutoresizingMaskIntoConstraints = false
+      button.heightAnchor.constraint(equalToConstant: 36).isActive = true // Fixed height
       stack.addArrangedSubview(button)
     }
 
