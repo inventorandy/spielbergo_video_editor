@@ -19,6 +19,9 @@ class VideoReviewViewController: UIViewController {
   private var closeButton: UIButton!
   private var addTextButton: UIButton!
 
+  // Flags
+  private var isAddingElement: Bool = false
+
   // Required initializer for Storyboards
   required init?(coder: NSCoder) {
     fatalError("init(coder:) has not been implemented")
@@ -117,7 +120,7 @@ class VideoReviewViewController: UIViewController {
     NSLayoutConstraint.activate([
       self.addTextButton.centerYAnchor.constraint(
         equalTo: view.safeAreaLayoutGuide.topAnchor,
-        constant: 48.0
+        constant: 96.0
       ),
       self.addTextButton.trailingAnchor.constraint(
         equalTo: view.safeAreaLayoutGuide.trailingAnchor,
@@ -134,12 +137,45 @@ class VideoReviewViewController: UIViewController {
   /// Button Actions
   // MARK: - Close Button Action
   @objc private func closeTapped() {
+    if isAddingElement {
+      return
+    }
     dismiss(animated: true)
   }
 
   /// MARK: - Add Text Button Action
   @objc private func addTextTapped() {
-    print("Add Text button tapped")
-    _ = TextOverlayView(containerView: view)
+    isAddingElement = true
+    updateUIElements()
+    _ = TextOverlayView(containerView: view, onExit: { [weak self] in
+      self?.isAddingElement = false
+      self?.updateUIElements()
+    })
+  }
+
+  // MARK: - Update UI
+  func updateUIElements() {
+    // Update the visibility of buttons based on the isAddingElement flag
+    // Do this on the main thread to ensure UI updates are smooth
+    DispatchQueue.main.async {
+      if self.isAddingElement {
+        // Disable buttons while adding text
+        self.closeButton.isHidden = true
+        self.addTextButton.isHidden = true
+      } else {
+        // Enable buttons when not adding text
+        self.closeButton.isHidden = false
+        self.addTextButton.isHidden = false
+      }
+    }
+  }
+
+  // MARK: - Deinit
+  deinit {
+    // Clean up player resources
+    queuePlayer?.pause()
+    playerLayer.removeFromSuperlayer()
+    queuePlayer = nil
+    playerLooper = nil
   }
 }

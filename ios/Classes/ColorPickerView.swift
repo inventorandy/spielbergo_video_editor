@@ -9,7 +9,7 @@ final class ColorPickerView: UIView {
   private let colors: [UIColor]
   
   // MARK: - Init
-  init(colors: [UIColor] = [.white, .red, .blue, .green, .yellow, .orange, .purple, .cyan, .magenta]) {
+  init(colors: [UIColor] = [.black, .white, .red, .blue, .green, .yellow, .orange, .purple, .cyan, .magenta]) {
     self.colors = colors
     super.init(frame: .zero)
     setupView()
@@ -21,7 +21,7 @@ final class ColorPickerView: UIView {
   
   // MARK: - Setup
   private func setupView() {
-    backgroundColor = UIColor.black.withAlphaComponent(0.5)
+    backgroundColor = .clear
     layer.cornerRadius = 8
     clipsToBounds = true
     

@@ -1,6 +1,8 @@
 import UIKit
 
 final class TextOverlayView: UIView, UITextViewDelegate {
+  // MARK: - Callbacks
+  var onExit: (() -> Void)?
 
   // MARK: - Subviews
   private let displayLabel = UILabel()
@@ -25,7 +27,7 @@ final class TextOverlayView: UIView, UITextViewDelegate {
   private var currentFontSize: CGFloat = 28
 
   // MARK: - Init
-  init(containerView: UIView, initialText: String? = nil) {
+  init(containerView: UIView, initialText: String? = nil, onExit: (() -> Void)? = nil) {
     let frameWidth = containerView.bounds.width - 40
     let frameHeight = containerView.bounds.height / 3
     let defaultFrame = CGRect(x: 0, y: 0, width: frameWidth, height: frameHeight)
@@ -34,6 +36,8 @@ final class TextOverlayView: UIView, UITextViewDelegate {
     setupDisplayLabel()
     setupEditTextView()
     setupGestures()
+
+    self.onExit = onExit
 
     center = containerView.center
     containerView.addSubview(self)
@@ -97,9 +101,7 @@ final class TextOverlayView: UIView, UITextViewDelegate {
       self?.displayLabel.textColor = color
       self?.editTextView.textColor = color
     }
-    print("Container Height: \(containerView.bounds.height)")
     let yPosition = containerView.bounds.height - 400 // Position above keyboard (approx)
-    print("Color Picker Y Position: \(yPosition)")
     picker.show(in: containerView, at: CGPoint(x: 20, y: yPosition), width: containerView.bounds.width - 40, height: 50)
     colorPicker = picker
   }
@@ -116,7 +118,13 @@ final class TextOverlayView: UIView, UITextViewDelegate {
     editTextView.isHidden = false
     displayLabel.isHidden = true
     editTextView.text = initialText ?? displayLabel.text ?? placeholder
-    editTextView.textColor = editTextView.text == placeholder ? .lightGray : .white
+
+    // Preserve the previously set text color
+    if displayLabel.textColor != .clear {
+      editTextView.textColor = displayLabel.textColor
+    } else {
+      editTextView.textColor = editTextView.text == placeholder ? .lightGray : .white
+    }
 
     // Reset transform for editing
     self.transform = .identity
@@ -153,6 +161,8 @@ final class TextOverlayView: UIView, UITextViewDelegate {
 
     editTextView.isHidden = true
     displayLabel.isHidden = false
+
+    self.onExit?()
   }
 
   // MARK: - Helpers
