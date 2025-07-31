@@ -108,9 +108,7 @@ final class TextOverlayView: UIView, UITextViewDelegate {
       self?.displayLabel.textColor = color
       self?.editTextView.textColor = color
     }
-    print("Container Height: \(containerView.bounds.height)")
     let yPosition = containerView.bounds.height - 400 // Position above keyboard (approx)
-    print("Color Picker Y Position: \(yPosition)")
     picker.show(in: containerView, at: CGPoint(x: 20, y: yPosition), width: containerView.bounds.width - 40, height: 50)
     colorPicker = picker
   }

@@ -450,17 +450,24 @@ class NewVideoViewController: UIViewController {
   }
 
   // MARK: - Close Button Tapped
+  // MARK: - Close Button Tapped
   @objc private func closeTapped(_ sender: UIButton) {
     if isRecording {
       currentOutput?.stopRecording()
       isRecording = false
     }
-    for item in recordedVideos {
-      try? FileManager.default.removeItem(at: item.url)
-    }
-    recordedVideos.removeAll()
-    flutterResult?(nil)
-    dismiss(animated: true)
+
+    let confirmClose = UIAlertController(title: "Discard Recording?", message: "Are you sure you want to discard your current recordings?", preferredStyle: .alert)
+    confirmClose.addAction(UIAlertAction(title: "Cancel", style: .cancel, handler: nil))
+    confirmClose.addAction(UIAlertAction(title: "Discard", style: .destructive, handler: { _ in
+      for item in self.recordedVideos {
+        try? FileManager.default.removeItem(at: item.url)
+      }
+      self.recordedVideos.removeAll()
+      self.flutterResult?(nil)
+      self.dismiss(animated: true)
+    }))
+    present(confirmClose, animated: true)
   }
 
   // Select Record Time
@@ -524,20 +531,24 @@ class NewVideoViewController: UIViewController {
   }
 
   // Delete Last Recorded Clip
+  // MARK: - Delete Last Clip
   @objc private func deleteLastClip(_ sender: UIButton) {
     guard !recordedVideos.isEmpty else { return }
-    let lastVideo = recordedVideos.removeLast()
-    do {
-      try FileManager.default.removeItem(at: lastVideo.url)
-      print("Deleted last video: \(lastVideo.url)")
-    } catch {
-      print("Error deleting video: \(error.localizedDescription)")
-    }
 
-    // Update the UI visibility based on the recording state
-    updateUIVisibility()
-    // Update the progress layer angle
-    updateProgressLayerAngle()
+    let confirmDelete = UIAlertController(title: "Delete Last Clip?", message: "Are you sure you want to delete the last recorded clip?", preferredStyle: .alert)
+    confirmDelete.addAction(UIAlertAction(title: "Cancel", style: .cancel, handler: nil))
+    confirmDelete.addAction(UIAlertAction(title: "Delete", style: .destructive, handler: { _ in
+      let lastVideo = self.recordedVideos.removeLast()
+      do {
+        try FileManager.default.removeItem(at: lastVideo.url)
+        print("Deleted last video: \(lastVideo.url)")
+      } catch {
+        print("Error deleting video: \(error.localizedDescription)")
+      }
+      self.updateUIVisibility()
+      self.updateProgressLayerAngle()
+    }))
+    present(confirmDelete, animated: true)
   }
 
   // Switch Camera

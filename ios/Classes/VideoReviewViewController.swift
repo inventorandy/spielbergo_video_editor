@@ -63,14 +63,12 @@ class VideoReviewViewController: UIViewController {
   }
 
   /// UI Element Setup
-  // MARK: - Setup Video Player
   private func setupVideoPlayer() {
     guard let composition = composition else { return }
 
     let playerItem = AVPlayerItem(asset: composition)
     playerItem.videoComposition = videoComposition
 
-    // Setup AVQueuePlayer and AVPlayerLooper for looping
     queuePlayer = AVQueuePlayer(playerItem: playerItem)
     if let queuePlayer = queuePlayer {
       playerLooper = AVPlayerLooper(player: queuePlayer, templateItem: playerItem)
@@ -84,7 +82,6 @@ class VideoReviewViewController: UIViewController {
     }
   }
 
-  // MARK: - Setup Close Button
   private func setupCloseButton() {
     self.closeButton.setImage(UIImage(systemName: "chevron.backward"), for: .normal)
     self.closeButton.tintColor = .white
@@ -100,7 +97,6 @@ class VideoReviewViewController: UIViewController {
     ])
   }
 
-  // MARK: - Add Text Button
   private func setupAddTextButton() {
     self.addTextButton.translatesAutoresizingMaskIntoConstraints = false
     let image = UIImage(
@@ -110,25 +106,16 @@ class VideoReviewViewController: UIViewController {
 
     self.addTextButton.setImage(image, for: .normal)
     self.addTextButton.tintColor = .white
-
     self.addTextButton.contentEdgeInsets = .zero
     self.addTextButton.imageEdgeInsets = .zero
     self.addTextButton.imageView?.contentMode = .scaleAspectFit
-
     self.addTextButton.layer.cornerRadius = 8
     self.addTextButton.clipsToBounds = true
-
     self.view.addSubview(self.addTextButton)
 
     NSLayoutConstraint.activate([
-      self.addTextButton.centerYAnchor.constraint(
-        equalTo: view.safeAreaLayoutGuide.topAnchor,
-        constant: 96.0
-      ),
-      self.addTextButton.trailingAnchor.constraint(
-        equalTo: view.safeAreaLayoutGuide.trailingAnchor,
-        constant: -16.0
-      ),
+      self.addTextButton.centerYAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 96.0),
+      self.addTextButton.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -16.0),
       self.addTextButton.widthAnchor.constraint(equalToConstant: 36),
       self.addTextButton.heightAnchor.constraint(equalToConstant: 36)
     ])
@@ -152,16 +139,32 @@ class VideoReviewViewController: UIViewController {
     ])
   }
 
-  /// Button Actions
-  // MARK: - Close Button Action
   @objc private func closeTapped() {
     if isAddingElement {
       return
     }
+
+    if textOverlays.isEmpty {
+      dismissEditor()
+    } else {
+      let alert = UIAlertController(title: "Discard Changes?", message: "You have unsaved edits. Are you sure you want to discard them?", preferredStyle: .alert)
+      alert.addAction(UIAlertAction(title: "Cancel", style: .cancel, handler: nil))
+      alert.addAction(UIAlertAction(title: "Discard", style: .destructive, handler: { _ in
+        self.dismissEditor()
+      }))
+      present(alert, animated: true)
+    }
+  }
+
+  private func dismissEditor() {
+    queuePlayer?.pause()
+    playerLayer.removeFromSuperlayer()
+    queuePlayer = nil
+    playerLooper = nil
+    textOverlays.removeAll()
     dismiss(animated: true)
   }
 
-  /// MARK: - Add Text Button Action
   @objc private func addTextTapped() {
     isAddingElement = true
     updateUIElements()
@@ -173,7 +176,6 @@ class VideoReviewViewController: UIViewController {
     textOverlays.append(overlay)
   }
 
-  // MARK: - Update UI
   func updateUIElements() {
     DispatchQueue.main.async {
       self.closeButton.isHidden = self.isAddingElement
@@ -181,12 +183,12 @@ class VideoReviewViewController: UIViewController {
     }
   }
 
-  // MARK: - Deinit
   deinit {
     queuePlayer?.pause()
     playerLayer.removeFromSuperlayer()
     queuePlayer = nil
     playerLooper = nil
+    textOverlays.removeAll()
   }
 }
 
