@@ -173,9 +173,23 @@ class VideoReviewViewController: UIViewController {
     let overlay = TextOverlayView(containerView: view, onExit: { [weak self] in
       self?.isAddingElement = false
       self?.updateUIElements()
+      self?.filterEmptyTextOverlays()
     })
     overlay.dragDelegate = self
+    self.appendTextOverlay(overlay)
+  }
+
+  private func appendTextOverlay(_ overlay: TextOverlayView) {
+    for existingOverlay in textOverlays {
+      if existingOverlay.text.isEmpty {
+        existingOverlay.removeFromSuperview()
+      }
+    }
     textOverlays.append(overlay)
+  }
+
+  private func filterEmptyTextOverlays() {
+    textOverlays.removeAll { $0.text.isEmpty }
   }
 
   func updateUIElements() {

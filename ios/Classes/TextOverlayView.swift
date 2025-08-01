@@ -371,4 +371,8 @@ final class TextOverlayView: UIView, UITextViewDelegate {
   func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
     return text != "\n"
   }
+
+  var text: String {
+    return displayLabel.text ?? ""
+  }
 }
