@@ -34,3 +34,10 @@ Add the following to your `Info.plist` (`ios/Runner/Info.plist`):
 <key>NSMicrophoneUsageDescription</key>
 <string>This app requires access to the microphone for audio recording in videos.</string>
 ```
+
+## Task List
+
+### iOS
+
+* Calculate correct transformations for CATextLayer
+* Save video in first edit screen.

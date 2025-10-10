@@ -12,7 +12,7 @@ final class TextOverlayView: UIView, UITextViewDelegate {
   weak var dragDelegate: TextOverlayDragDelegate?
 
   // MARK: - Subviews
-  private let displayLabel = UILabel()
+  let displayLayer = CATextLayer()
   private let editTextView = UITextView()
   private var dismissLayer: UIButton?
   private var fontSlider: UISlider?
@@ -22,15 +22,15 @@ final class TextOverlayView: UIView, UITextViewDelegate {
   private var fontPickerButton: UIButton?
 
   // MARK: - State
-  private var isEditingMode = true
-  private let placeholder = "Enter text here..."
+  private var isEditingMode: Bool = true
+  private let placeholder: String = "Enter text here..."
 
   private var savedCenter: CGPoint = .zero
   private var savedRotation: CGFloat = 0
   private var savedScale: CGFloat = 1
 
   // Font settings
-  private let characterLimit = 200
+  private let characterLimit: Int = 200
   private let minFontSize: CGFloat = 16
   private let maxFontSize: CGFloat = 48
   private var currentFontSize: CGFloat = 28
@@ -44,7 +44,7 @@ final class TextOverlayView: UIView, UITextViewDelegate {
     ("Script", "Papyrus"),
     ("Code", "Courier-Bold")
   ]
-  private var selectedFontIndex = 0
+  private var selectedFontIndex: Int = 0
 
   // MARK: - Init
   init(containerView: UIView, initialText: String? = nil, onExit: (() -> Void)? = nil) {
@@ -53,7 +53,7 @@ final class TextOverlayView: UIView, UITextViewDelegate {
     let defaultFrame = CGRect(x: 0, y: 0, width: frameWidth, height: frameHeight)
 
     super.init(frame: defaultFrame)
-    setupDisplayLabel()
+    setupDisplayLayer()
     setupEditTextView()
     setupGestures()
 
@@ -68,30 +68,31 @@ final class TextOverlayView: UIView, UITextViewDelegate {
     fatalError("init(coder:) has not been implemented")
   }
 
-  private func applyCurrentFont() {
-    let fontName = fontOptions[selectedFontIndex].fontName
-    let font = UIFont(name: fontName, size: currentFontSize) ?? UIFont.systemFont(ofSize: currentFontSize)
-    displayLabel.font = font
-    editTextView.font = font
-  }
+  // MARK: - Setup Display Layer
+  private func setupDisplayLayer() {
+    displayLayer.alignmentMode = .center
+    displayLayer.isWrapped = true
+    displayLayer.truncationMode = .none
+    displayLayer.contentsScale = UIScreen.main.scale
+    displayLayer.foregroundColor = UIColor.white.cgColor
+    displayLayer.font = UIFont(name: fontOptions[selectedFontIndex].fontName, size: currentFontSize)
+    displayLayer.fontSize = currentFontSize
+    displayLayer.frame = bounds
 
-  // MARK: - Setup
-  private func setupDisplayLabel() {
-    displayLabel.textAlignment = .center
-    displayLabel.textColor = .white
-    // displayLabel.font = UIFont.systemFont(ofSize: currentFontSize, weight: .bold)
-    displayLabel.font = UIFont(name: fontOptions[selectedFontIndex].fontName, size: currentFontSize) ?? UIFont.systemFont(ofSize: currentFontSize)
-    displayLabel.numberOfLines = 0
-    displayLabel.lineBreakMode = .byWordWrapping
-    displayLabel.isUserInteractionEnabled = true
-    addSubview(displayLabel)
+    // Optional visual aids for clarity during layout
+    displayLayer.shadowOpacity = 0.4
+    displayLayer.shadowRadius = 3
+    displayLayer.shadowOffset = CGSize(width: 0, height: 1)
+    displayLayer.shadowColor = UIColor.black.cgColor
+
+    layer.addSublayer(displayLayer)
   }
 
   private func setupEditTextView() {
     editTextView.delegate = self
     editTextView.textAlignment = .center
-    // editTextView.font = UIFont.systemFont(ofSize: currentFontSize, weight: .bold)
-    editTextView.font = UIFont(name: fontOptions[selectedFontIndex].fontName, size: currentFontSize) ?? UIFont.systemFont(ofSize: currentFontSize)
+    editTextView.font = UIFont(name: fontOptions[selectedFontIndex].fontName, size: currentFontSize)
+      ?? UIFont.systemFont(ofSize: currentFontSize)
     editTextView.textColor = .lightGray
     editTextView.backgroundColor = .clear
     editTextView.isScrollEnabled = true
@@ -101,7 +102,16 @@ final class TextOverlayView: UIView, UITextViewDelegate {
     addSubview(editTextView)
   }
 
-  // MARK: - Toolbar Button
+  // MARK: - Font Handling
+  private func applyCurrentFont() {
+    let fontName: String = fontOptions[selectedFontIndex].fontName
+    let font = UIFont(name: fontName, size: currentFontSize) ?? UIFont.systemFont(ofSize: currentFontSize)
+    displayLayer.font = font
+    displayLayer.fontSize = currentFontSize
+    editTextView.font = font
+  }
+
+  // MARK: - Toolbar Buttons
   private func setupPaintButton(in containerView: UIView) {
     let button = UIButton(type: .system)
     button.setImage(UIImage(systemName: "paintpalette.fill"), for: .normal)
@@ -132,7 +142,7 @@ final class TextOverlayView: UIView, UITextViewDelegate {
     fontPickerButton = nil
   }
 
-  // MARK: - Toggle Pickers
+  // MARK: - Pickers
   @objc private func toggleColorPicker() {
     guard let containerView = superview else { return }
     fontPicker?.hide()
@@ -146,11 +156,12 @@ final class TextOverlayView: UIView, UITextViewDelegate {
 
     let picker = ColorPickerView()
     picker.onColorSelected = { [weak self] color in
-      self?.displayLabel.textColor = color
+      self?.displayLayer.foregroundColor = color.cgColor
       self?.editTextView.textColor = color
     }
-    let yPosition = containerView.bounds.height - 400 // Position above keyboard (approx)
-    picker.show(in: containerView, at: CGPoint(x: 20, y: yPosition), width: containerView.bounds.width - 40, height: 64)
+    let yPosition = containerView.bounds.height - 400
+    picker.show(in: containerView, at: CGPoint(x: 20, y: yPosition),
+                width: containerView.bounds.width - 40, height: 64)
     colorPicker = picker
   }
 
@@ -171,8 +182,9 @@ final class TextOverlayView: UIView, UITextViewDelegate {
       self?.selectedFontIndex = index
       self?.applyCurrentFont()
     }
-    let yPosition = containerView.bounds.height - 400 // Position above keyboard (approx)
-    picker.show(in: containerView, at: CGPoint(x: 20, y: yPosition), width: containerView.bounds.width - 40, height: 64)
+    let yPosition = containerView.bounds.height - 400
+    picker.show(in: containerView, at: CGPoint(x: 20, y: yPosition),
+                width: containerView.bounds.width - 40, height: 64)
     fontPicker = picker
   }
 
@@ -186,26 +198,26 @@ final class TextOverlayView: UIView, UITextViewDelegate {
 
     isEditingMode = true
     editTextView.isHidden = false
-    displayLabel.isHidden = true
-    editTextView.text = initialText ?? displayLabel.text ?? placeholder
-    displayLabel.text = initialText ?? placeholder
+    displayLayer.isHidden = true
+    editTextView.text = initialText ?? (displayLayer.string as? String) ?? placeholder
 
-    if displayLabel.textColor != .clear {
-      editTextView.textColor = displayLabel.textColor
+    if let fg = displayLayer.foregroundColor {
+      editTextView.textColor = UIColor(cgColor: fg)
     } else {
       editTextView.textColor = .white
     }
 
-    self.transform = .identity
-    self.bounds = CGRect(x: 0, y: 0, width: containerView.bounds.width - 40, height: containerView.bounds.height / 3)
-    self.center = containerView.center
+    transform = .identity
+    bounds = CGRect(x: 0, y: 0, width: containerView.bounds.width - 20,
+                    height: containerView.bounds.height / 3)
+    center = containerView.center
 
     addDismissLayer(to: containerView)
     setupFontSlider(in: containerView)
     setupPaintButton(in: containerView)
     setupFontPickerButton(in: containerView)
 
-    editTextView.font = displayLabel.font
+    editTextView.font = UIFont(name: fontOptions[selectedFontIndex].fontName, size: currentFontSize)
     editTextView.becomeFirstResponder()
   }
 
@@ -216,7 +228,12 @@ final class TextOverlayView: UIView, UITextViewDelegate {
       self.editTextView.resignFirstResponder()
 
       let finalText = self.editTextView.text.trimmingCharacters(in: .whitespacesAndNewlines)
-      self.displayLabel.text = finalText.isEmpty ? placeholder : finalText
+      self.displayLayer.string = finalText.isEmpty ? self.placeholder : finalText
+      self.displayLayer.foregroundColor = finalText.isEmpty
+        ? UIColor.lightGray.cgColor
+        : (self.editTextView.textColor ?? .white).cgColor
+      self.displayLayer.borderWidth = finalText.isEmpty ? 0 : 1
+      self.displayLayer.borderColor = finalText.isEmpty ? UIColor.clear.cgColor : UIColor.red.cgColor
 
       self.dismissLayer?.removeFromSuperview()
       self.removeFontSlider()
@@ -228,14 +245,15 @@ final class TextOverlayView: UIView, UITextViewDelegate {
       self.fontPicker = nil
 
       if self.savedCenter == .zero, let superview = self.superview {
-      self.savedCenter = superview.center
+        self.savedCenter = superview.center
       }
 
       self.center = self.savedCenter
-      self.transform = CGAffineTransform(rotationAngle: self.savedRotation).scaledBy(x: self.savedScale, y: self.savedScale)
+      self.transform = CGAffineTransform(rotationAngle: self.savedRotation)
+        .scaledBy(x: self.savedScale, y: self.savedScale)
 
       self.editTextView.isHidden = true
-      self.displayLabel.isHidden = false
+      self.displayLayer.isHidden = false
 
       self.onExit?()
     }
@@ -247,7 +265,7 @@ final class TextOverlayView: UIView, UITextViewDelegate {
     dismissButton.backgroundColor = .clear
     dismissButton.addTarget(self, action: #selector(dismissEditing), for: .touchUpInside)
     containerView.insertSubview(dismissButton, belowSubview: self)
-    self.dismissLayer = dismissButton
+    dismissLayer = dismissButton
   }
 
   @objc private func dismissEditing() {
@@ -263,7 +281,7 @@ final class TextOverlayView: UIView, UITextViewDelegate {
     slider.value = Float(currentFontSize)
 
     slider.transform = CGAffineTransform(rotationAngle: -.pi / 2)
-    slider.center = CGPoint(x: 20, y: ((containerView.bounds.height / 4 ) + 48.0))
+    slider.center = CGPoint(x: 20, y: ((containerView.bounds.height / 4) + 48.0))
 
     let thumbSize: CGFloat = 18
     let thumbImage = UIGraphicsImageRenderer(size: CGSize(width: thumbSize, height: thumbSize)).image { ctx in
@@ -271,14 +289,11 @@ final class TextOverlayView: UIView, UITextViewDelegate {
       ctx.cgContext.fillEllipse(in: CGRect(origin: .zero, size: CGSize(width: thumbSize, height: thumbSize)))
     }
     slider.setThumbImage(thumbImage, for: .normal)
-
     slider.minimumTrackTintColor = .white
     slider.maximumTrackTintColor = UIColor.white.withAlphaComponent(0.3)
-
     slider.addTarget(self, action: #selector(fontSliderChanged(_:)), for: .valueChanged)
-
     containerView.addSubview(slider)
-    self.fontSlider = slider
+    fontSlider = slider
   }
 
   private func removeFontSlider() {
@@ -291,6 +306,7 @@ final class TextOverlayView: UIView, UITextViewDelegate {
     applyCurrentFont()
   }
 
+  // MARK: - Gestures
   private func setupGestures() {
     let panGesture = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
     let rotateGesture = UIRotationGestureRecognizer(target: self, action: #selector(handleRotate(_:)))
@@ -306,7 +322,7 @@ final class TextOverlayView: UIView, UITextViewDelegate {
 
   override func layoutSubviews() {
     super.layoutSubviews()
-    displayLabel.frame = bounds
+    displayLayer.frame = bounds
     editTextView.frame = bounds
   }
 
@@ -346,18 +362,11 @@ final class TextOverlayView: UIView, UITextViewDelegate {
 
   @objc private func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
     if !isEditingMode {
-      enterEditMode(initialText: displayLabel.text)
+      enterEditMode(initialText: displayLayer.string as? String)
     }
   }
 
   // MARK: - UITextViewDelegate
-  // func textViewDidBeginEditing(_ textView: UITextView) {
-  //   // if textView.text == placeholder {
-  //   //   textView.text = ""
-  //   //   textView.textColor = .white
-  //   // }
-  // }
-
   func textViewDidChange(_ textView: UITextView) {
     if textView.text.count > characterLimit {
       textView.text = String(textView.text.prefix(characterLimit))
@@ -372,7 +381,8 @@ final class TextOverlayView: UIView, UITextViewDelegate {
     return text != "\n"
   }
 
+  // MARK: - Public
   var text: String {
-    return displayLabel.text ?? ""
+    return (displayLayer.string as? String) ?? ""
   }
 }

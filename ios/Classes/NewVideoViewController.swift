@@ -593,10 +593,18 @@ class NewVideoViewController: UIViewController {
         guard let self = self else { return }
         switch result {
           case .success(let composition, let videoComposition):
+            print("Composition created successfully")
+            // Present the Video Review View Controller on the main thread
             Task { @MainActor in
+              guard let flutterResult = self.flutterResult else {
+                print("flutterResult is nil")
+                return
+              }
+
               let videoReviewVC = VideoReviewViewController(
                 composition: composition,
-                videoComposition: videoComposition
+                videoComposition: videoComposition,
+                flutterResult: flutterResult
               )
               self.present(videoReviewVC, animated: false)
             }
@@ -719,7 +727,7 @@ class NewVideoViewController: UIViewController {
 // MARK: - AVCaptureFileOutputRecordingDelegate
 extension NewVideoViewController: AVCaptureFileOutputRecordingDelegate {
   func fileOutput(_ output: AVCaptureFileOutput, didFinishRecordingTo outputFileURL: URL, from connections: [AVCaptureConnection], error: Error?) {
-    if let error = error {
+    if let error: any Error = error {
       print("Error recording video: \(error.localizedDescription)")
       // Handle the error (e.g., show an alert to the user)
       return

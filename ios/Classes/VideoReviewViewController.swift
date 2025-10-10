@@ -6,6 +6,8 @@ import Flutter
 /// like text overlays and filters. There are also buttons for the timeline
 /// editor and more complex effects.
 class VideoReviewViewController: UIViewController {
+  var flutterResult: FlutterResult?
+
   // Composition and Video Composition
   var composition: AVMutableComposition?
   var videoComposition: AVMutableVideoComposition?
@@ -17,10 +19,12 @@ class VideoReviewViewController: UIViewController {
 
   // Buttons
   private var closeButton: UIButton!
+  private var doneButton: UIButton!
   private var addTextButton: UIButton!
 
   // Flags
   private var isAddingElement: Bool = false
+  private var doneWasTapped: Bool = false
 
   // Text overlays
   private var textOverlays: [TextOverlayView] = []
@@ -34,14 +38,19 @@ class VideoReviewViewController: UIViewController {
   // Initialize with parameters
   init(
     composition: AVMutableComposition,
-    videoComposition: AVMutableVideoComposition
+    videoComposition: AVMutableVideoComposition,
+    flutterResult: @escaping FlutterResult
   ) {
     // Set the composition and videoComposition properties
     self.composition = composition
     self.videoComposition = videoComposition
 
+    // Set the flutterResult property
+    self.flutterResult = flutterResult
+
     // Initialize the buttons
     self.closeButton = UIButton(type: .system)
+    self.doneButton = UIButton(type: .custom)
     self.addTextButton = UIButton(type: .custom)
 
     super.init(nibName: nil, bundle: nil)
@@ -49,11 +58,19 @@ class VideoReviewViewController: UIViewController {
   }
 
   override func viewDidLoad() {
+    // Call the super method
     super.viewDidLoad()
+    // Set the view background color
     view.backgroundColor = .black
+    // Setup the Video Player
     setupVideoPlayer()
+    // Setup the Done Button
+    setupDoneButton()
+    // Setup the Close Button
     setupCloseButton()
+    // Setup the Add Text Button
     setupAddTextButton()
+    // Setup the Delete Bin View
     setupDeleteBinView()
   }
 
@@ -64,13 +81,13 @@ class VideoReviewViewController: UIViewController {
 
   /// UI Element Setup
   private func setupVideoPlayer() {
-    guard let composition = composition else { return }
+    guard let composition: AVMutableComposition = composition else { return }
 
-    let playerItem = AVPlayerItem(asset: composition)
+    let playerItem: AVPlayerItem = AVPlayerItem(asset: composition)
     playerItem.videoComposition = videoComposition
 
     queuePlayer = AVQueuePlayer(playerItem: playerItem)
-    if let queuePlayer = queuePlayer {
+    if let queuePlayer: AVQueuePlayer = queuePlayer {
       playerLooper = AVPlayerLooper(player: queuePlayer, templateItem: playerItem)
 
       playerLayer = AVPlayerLayer(player: queuePlayer)
@@ -95,6 +112,46 @@ class VideoReviewViewController: UIViewController {
       self.closeButton.widthAnchor.constraint(equalToConstant: 32),
       self.closeButton.heightAnchor.constraint(equalToConstant: 32)
     ])
+  }
+
+    // Setup Done Button
+  private func setupDoneButton() {
+    self.doneButton.translatesAutoresizingMaskIntoConstraints = false
+
+    let image = UIImage(
+      systemName: "checkmark.circle.fill",
+      withConfiguration: UIImage.SymbolConfiguration(pointSize: 28, weight: .regular)
+    )
+
+    self.doneButton.setImage(image, for: .normal)
+    self.doneButton.tintColor = .white
+
+    // Remove extra padding around image
+    self.doneButton.contentEdgeInsets = .zero
+    self.doneButton.imageEdgeInsets = .zero
+    self.doneButton.imageView?.contentMode = .scaleAspectFit
+
+    // Optional: round background
+    self.doneButton.layer.cornerRadius = 8
+    self.doneButton.clipsToBounds = true
+
+    self.view.addSubview(self.doneButton)
+
+    NSLayoutConstraint.activate([
+      self.doneButton.centerYAnchor.constraint(
+        equalTo: view.safeAreaLayoutGuide.bottomAnchor,
+        constant: -56.0
+      ),
+      self.doneButton.trailingAnchor.constraint(
+        equalTo: view.safeAreaLayoutGuide.trailingAnchor,
+        constant: -16.0
+      ),
+      self.doneButton.widthAnchor.constraint(equalToConstant: 32),
+      self.doneButton.heightAnchor.constraint(equalToConstant: 32)
+    ])
+
+    // Add the target action for the Done Button
+    self.doneButton.addTarget(self, action: #selector(doneTapped), for: .touchUpInside)
   }
 
   private func setupAddTextButton() {
@@ -156,6 +213,115 @@ class VideoReviewViewController: UIViewController {
     }
   }
 
+  /// Button Handlers
+  // MARK: - Done Button Tapped
+  @objc private func doneTapped(_ sender: UIButton) {
+    guard !isAddingElement, !doneWasTapped else { return }
+    doneWasTapped = true
+
+    textOverlays.forEach { $0.exitEditMode(animated: false) }
+    guard let composition: AVMutableComposition = composition else { return }
+
+    let outputURL: URL = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString)
+      .appendingPathExtension("mp4")
+
+    let renderSize: CGSize = CGSize(width: 1080, height: 1920)
+
+    // Base layers
+    let parentLayer: CALayer = CALayer()
+    parentLayer.frame = CGRect(origin: .zero, size: renderSize)
+    parentLayer.isGeometryFlipped = true
+
+    let videoLayer: CALayer = CALayer()
+    videoLayer.frame = parentLayer.bounds
+    parentLayer.addSublayer(videoLayer)
+
+    // Ratio between export pixels and preview points
+    let scaleFactor = renderSize.width / view.bounds.width
+
+    // Reuse each overlay's CATextLayer
+    for overlay in textOverlays {
+      let source = overlay.displayLayer
+
+      let textLayer: CATextLayer = CATextLayer()
+      textLayer.string = source.string
+      textLayer.font = source.font
+      textLayer.fontSize = source.fontSize * scaleFactor  // ← your fix
+      textLayer.foregroundColor = source.foregroundColor
+      textLayer.alignmentMode = source.alignmentMode
+      textLayer.isWrapped = source.isWrapped
+      textLayer.truncationMode = source.truncationMode
+      textLayer.contentsScale = max(UIScreen.main.scale, 3)
+      textLayer.shadowOpacity = source.shadowOpacity
+      textLayer.shadowRadius = source.shadowRadius
+      textLayer.shadowOffset = source.shadowOffset
+      textLayer.shadowColor = source.shadowColor
+
+      // Convert overlay frame from preview space to video export space
+      let baseFrame: CGRect
+      if let playerFrame: CGRect = playerLayer.videoRectIfAvailable() {
+        let normalized = CGRect(
+          x: (overlay.frame.minX - playerFrame.minX) / playerFrame.width,
+          y: (overlay.frame.minY - playerFrame.minY) / playerFrame.height,
+          width: overlay.frame.width / playerFrame.width,
+          height: overlay.frame.height / playerFrame.height
+        )
+
+        baseFrame = CGRect(
+          x: normalized.minX * renderSize.width,
+          y: normalized.minY * renderSize.height,
+          width: normalized.width * renderSize.width,
+          height: normalized.height * renderSize.height
+        )
+      } else {
+        baseFrame = CGRect(
+          x: overlay.frame.origin.x / view.bounds.width * renderSize.width,
+          y: overlay.frame.origin.y / view.bounds.height * renderSize.height,
+          width: overlay.frame.width / view.bounds.width * renderSize.width,
+          height: overlay.frame.height / view.bounds.height * renderSize.height
+        )
+      }
+
+      textLayer.frame = baseFrame
+
+      // Apply rotation and scale exactly as seen on-screen
+      textLayer.setAffineTransform(overlay.transform)
+
+      parentLayer.addSublayer(textLayer)
+    }
+
+    // Export setup
+    guard let videoComposition: AVMutableVideoComposition = videoComposition else { return }
+    let export: AVAssetExportSession = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetHighestQuality)!
+    export.outputURL = outputURL
+    export.outputFileType = .mp4
+    export.shouldOptimizeForNetworkUse = true
+
+    let exportVideoComp: AVMutableVideoComposition = AVMutableVideoComposition()
+    exportVideoComp.instructions = videoComposition.instructions
+    exportVideoComp.frameDuration = videoComposition.frameDuration
+    exportVideoComp.renderSize = renderSize
+    exportVideoComp.animationTool = AVVideoCompositionCoreAnimationTool(
+      postProcessingAsVideoLayer: videoLayer,
+      in: parentLayer
+    )
+    export.videoComposition = exportVideoComp
+
+    // Async export
+    Task { @MainActor in
+      do {
+        try await export.export(to: outputURL, as: .mp4)
+        print("✅ Export completed: \(outputURL.path)")
+        self.presentingViewController?.presentingViewController?.dismiss(animated: true)
+        self.flutterResult?(outputURL.path)
+      } catch {
+        print("❌ Export failed: \(error.localizedDescription)")
+        self.doneWasTapped = false
+      }
+    }
+  }
+
   private func dismissEditor() {
     queuePlayer?.pause()
     playerLayer.removeFromSuperlayer()
@@ -185,6 +351,8 @@ class VideoReviewViewController: UIViewController {
         existingOverlay.removeFromSuperview()
       }
     }
+    // DEBUG: print overlay rect
+    print("OVERLAY: \(overlay.frame)")
     textOverlays.append(overlay)
   }
 
@@ -254,5 +422,14 @@ extension VideoReviewViewController: TextOverlayDragDelegate {
       self.deleteBinView.transform = .identity
       self.deleteBinView.tintColor = .white
     }
+  }
+}
+
+private extension AVPlayerLayer {
+  func videoRectIfAvailable() -> CGRect? {
+    if !self.videoRect.isEmpty && self.videoRect.width > 0 {
+      return self.videoRect
+    }
+    return nil
   }
 }
